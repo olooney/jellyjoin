@@ -1,0 +1,17 @@
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
