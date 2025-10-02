@@ -6,6 +6,8 @@ from scipy.optimize import linear_sum_assignment
 from .similarity import damerau_levenshtein_similarity
 from .similarity import get_similarity_function
 
+__version__ = "0.1.1"
+
 class SimilarityStrategy:
     def __call__(self, left_texts: List[str], right_texts: List[str]) -> np.ndarray:
         pass

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.1.0"
+version = "0.1.1"
 description = "Utilities for dataset similarity and joins"
 authors = [
     { name = "Oran Looney", email = "olooney@gmail.com" }
@@ -21,6 +21,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "build",
+    "twine",
     "black",
     "pytest",
     "matplotlib>=3.8.4",
