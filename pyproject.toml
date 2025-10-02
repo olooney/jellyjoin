@@ -13,13 +13,16 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
-    "jellyfish>=1.2.0"
+    "jellyfish>=1.2.0",
+    "numpy>=1.26.4",
+    "pandas>=2.2.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit",
     "black",
+    "pytest",
+    "matplotlib>=3.8.4",
 ]
 
 [tool.setuptools.packages.find]
