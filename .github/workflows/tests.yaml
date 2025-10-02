@@ -20,9 +20,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # install the package (PEP 621 / pyproject) and test deps
           pip install -e .
-          pip install pytest numpy
+          pip install pytest>=8.3.3
 
       - name: Run tests
         run: pytest -q
