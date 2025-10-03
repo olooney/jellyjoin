@@ -10,7 +10,7 @@ authors = [
     { name = "Oran Looney", email = "olooney@gmail.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = [
     "jellyfish>=1.2.0",
