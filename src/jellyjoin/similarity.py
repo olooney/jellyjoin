@@ -10,7 +10,6 @@ __all__ = [
 ]
 
 
-
 def hamming_similarity(x: str, y: str) -> float:
     """
     Compute the normalized Hamming similarity between two strings.
