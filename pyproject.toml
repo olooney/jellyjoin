@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "dotenv",
     "openai",
     "build",
     "twine",
