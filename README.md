@@ -148,7 +148,7 @@ To get one-to-many, many-to-one, or many-to-many matches, specify the `allow_man
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="both")
 ```
 
-|   Left |   Right |   Similarity | Qualified Column Name        | Type_left      | Table   | Field Name                   | Type_right   |
+|   Left |   Right |   Similarity | Column Name                  | Type_left      | Table   | Field Name                   | Type_right   |
 |--------|---------|--------------|------------------------------|----------------|---------|------------------------------|--------------|
 |      0 |     nan |   nan        | user.email                   | text           | user    | nan                          | nan          |
 |      1 |       0 |     0.471828 | user.touch_count             | integer        | user    | Recent Touch Events          | number       |
