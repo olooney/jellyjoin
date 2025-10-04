@@ -78,16 +78,16 @@ on Pandas DataFrames.
 
 Let's say we have a list of database columns:
 
-| Column Name        | Type           | Table   |
-|------------------------------|----------------|---------|
-| user.email                   | text           | user    |
-| user.touch_count             | integer        | user    |
-| user.propensity_score        | numeric        | user    |
-| user.ltv                     | numeric(10, 2) | user    |
-| user.purchase_count          | integer        | user    |
-| account.status_code          | char(1)        | account |
-| account.age                  | integer        | account |
-| account.total_purchase_count | integer        | account |
+| Column Name                  | Type           |
+|------------------------------|----------------|
+| user.email                   | text           |
+| user.touch_count             | integer        |
+| user.propensity_score        | numeric        |
+| user.ltv                     | numeric(10, 2) |
+| user.purchase_count          | integer        |
+| account.status_code          | char(1)        |
+| account.age                  | integer        |
+| account.total_purchase_count | integer        |
 
 And we want to associate them to these front-end fields:
 
@@ -110,14 +110,14 @@ will be returned.
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4)
 ```
 
-|   Left |   Right |   Similarity | Column Name             | Type_left      | Table   | Field Name                   | Type_right   |
-|--------|---------|--------------|-------------------------|----------------|---------|------------------------------|--------------|
-|      1 |       0 |     0.471828 | user.touch_count        | integer        | user    | Recent Touch Events          | number       |
-|      2 |       3 |     0.819823 | user.propensity_score   | numeric        | user    | User Propensity Score        | number       |
-|      3 |       4 |     0.476054 | user.ltv                | numeric(10, 2) | user    | Estimated Lifetime Value ($) | currency     |
-|      4 |       6 |     0.74174  | user.purchase_count     | integer        | user    | Number of Purchases          | number       |
-|      5 |       5 |     0.606886 | account.status_code     | char(1)        | account | Account Status               | string       |
-|      6 |       2 |     0.556893 | account.age             | integer        | account | Account Age (Years)          | number       |
+|   Left |   Right |   Similarity | Column Name             | Type_left      | Field Name                   | Type_right   |
+|--------|---------|--------------|-------------------------|----------------|------------------------------|--------------|
+|      1 |       0 |     0.471828 | user.touch_count        | integer        | Recent Touch Events          | number       |
+|      2 |       3 |     0.819823 | user.propensity_score   | numeric        | User Propensity Score        | number       |
+|      3 |       4 |     0.476054 | user.ltv                | numeric(10, 2) | Estimated Lifetime Value ($) | currency     |
+|      4 |       6 |     0.74174  | user.purchase_count     | integer        | Number of Purchases          | number       |
+|      5 |       5 |     0.606886 | account.status_code     | char(1)        | Account Status               | string       |
+|      6 |       2 |     0.556893 | account.age             | integer        | Account Age (Years)          | number       |
 
 This only shows the single best match above a threshold of 0.4, which is useful if you want reliable, one-to-one matches. To include rows that didn't match
 in the result, specify how you want to join: left, right, or outer. This options works the same was as the `how` option in `pandas.merge()`:
@@ -126,18 +126,18 @@ in the result, specify how you want to join: left, right, or outer. This options
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer")
 ```
 
-|   Left |   Right |   Similarity | Column Name                  | Type_left      | Table   | Field Name                   | Type_right   |
-|--------|---------|--------------|------------------------------|----------------|---------|------------------------------|--------------|
-|      0 |     nan |   nan        | user.email                   | text           | user    | nan                          | nan          |
-|      1 |       0 |     0.471828 | user.touch_count             | integer        | user    | Recent Touch Events          | number       |
-|      2 |       3 |     0.819823 | user.propensity_score        | numeric        | user    | User Propensity Score        | number       |
-|      3 |       4 |     0.475964 | user.ltv                     | numeric(10, 2) | user    | Estimated Lifetime Value ($) | currency     |
-|      4 |       6 |     0.741805 | user.purchase_count          | integer        | user    | Number of Purchases          | number       |
-|      5 |       5 |     0.606886 | account.status_code          | char(1)        | account | Account Status               | string       |
-|      6 |       2 |     0.556831 | account.age                  | integer        | account | Account Age (Years)          | number       |
-|      7 |     nan |   nan        | account.total_purchase_count | integer        | account | nan                          | nan          |
-|    nan |       1 |   nan        | nan                          | nan            | nan     | Total Touch Events           | number       |
-|    nan |       7 |   nan        | nan                          | nan            | nan     | Freetext Notes               | string       |
+|   Left |   Right |   Similarity | Column Name                  | Type_left      | Field Name                   | Type_right   |
+|--------|---------|--------------|------------------------------|----------------|------------------------------|--------------|
+|      0 |     nan |   nan        | user.email                   | text           | nan                          | nan          |
+|      1 |       0 |     0.471828 | user.touch_count             | integer        | Recent Touch Events          | number       |
+|      2 |       3 |     0.819823 | user.propensity_score        | numeric        | User Propensity Score        | number       |
+|      3 |       4 |     0.475964 | user.ltv                     | numeric(10, 2) | Estimated Lifetime Value ($) | currency     |
+|      4 |       6 |     0.741805 | user.purchase_count          | integer        | Number of Purchases          | number       |
+|      5 |       5 |     0.606886 | account.status_code          | char(1)        | Account Status               | string       |
+|      6 |       2 |     0.556831 | account.age                  | integer        | Account Age (Years)          | number       |
+|      7 |     nan |   nan        | account.total_purchase_count | integer        | nan                          | nan          |
+|    nan |       1 |   nan        | nan                          | nan            | Total Touch Events           | number       |
+|    nan |       7 |   nan        | nan                          | nan            | Freetext Notes               | string       |
 
 These join types show the missing rows, but they are still orphaned (not joined to anything) because by default the algorithm only takes
 the single best match. These results will show `nan` values (Panda's equivalent of NULL in SQL) for columns on the other side of the join.
@@ -147,19 +147,6 @@ To get one-to-many, many-to-one, or many-to-many matches, specify the `allow_man
 ```python
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="both")
 ```
-
-|   Left |   Right |   Similarity | Column Name                  | Type_left      | Table   | Field Name                   | Type_right   |
-|--------|---------|--------------|------------------------------|----------------|---------|------------------------------|--------------|
-|      0 |     nan |   nan        | user.email                   | text           | user    | nan                          | nan          |
-|      1 |       0 |     0.471828 | user.touch_count             | integer        | user    | Recent Touch Events          | number       |
-|      1 |       1 |     0.48877  | user.touch_count             | integer        | user    | Total Touch Events           | number       |
-|      2 |       3 |     0.819823 | user.propensity_score        | numeric        | user    | User Propensity Score        | number       |
-|      3 |       4 |     0.476054 | user.ltv                     | numeric(10, 2) | user    | Estimated Lifetime Value ($) | currency     |
-|      4 |       6 |     0.74174  | user.purchase_count          | integer        | user    | Number of Purchases          | number       |
-|      5 |       5 |     0.606886 | account.status_code          | char(1)        | account | Account Status               | string       |
-|      6 |       2 |     0.556844 | account.age                  | integer        | account | Account Age (Years)          | number       |
-|      7 |       6 |     0.665931 | account.total_purchase_count | integer        | account | Number of Purchases          | number       |
-|    nan |       7 |   nan        | nan                          | nan            | nan     | Freetext Notes               | string       |
 
 ![One-to-Many Association](https://raw.githubusercontent.com/olooney/jellyjoin/main/docs/images/association_many.png)
 
