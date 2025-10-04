@@ -4,11 +4,12 @@
 
 Join dataframes or lists based on semantic similarity.
 
-- PyPI https://pypi.org/project/jellyjoin/ [![PyPI](https://img.shields.io/pypi/v/jellyjoin.svg)](https://pypi.org/project/jellyjoin/) ![License](https://img.shields.io/pypi/l/jellyjoin.svg) ![Python Versions](https://img.shields.io/pypi/pyversions/jellyjoin.svg)
+- PyPI https://pypi.org/project/jellyjoin/
 - GitHub: https://github.com/olooney/jellyjoin
 
----
+ [![PyPI](https://img.shields.io/pypi/v/jellyjoin.svg)](https://pypi.org/project/jellyjoin/) ![License](https://img.shields.io/pypi/l/jellyjoin.svg) ![Python Versions](https://img.shields.io/pypi/pyversions/jellyjoin.svg)
 
+## About
 
 Jellyjoin does "soft joins" based not exact matches, but on approximate similarity. It uses a cost based
 optimization to find the "best" match. It can use older string similarity metrics as well but using a 
@@ -30,6 +31,7 @@ pip install jellyjoin
 
 ## Basic Usage
 
+The most basic way to use `jellyjoin` is to simply pass it two lists:
 
 ```python
 import jellyjoin
@@ -67,7 +69,7 @@ from jellyjoin.plots import plot_similarity_matrix
 plot_similarity_matrix(similarity_matrix)
 ```
 
-![Similarity Matrix](https://raw.githubusercontent.com/olooney/jellyjoin/main/images/section_similarity_matrix.png)
+![Similarity Matrix](https://raw.githubusercontent.com/olooney/jellyjoin/main/docs/images/section_similarity_matrix.png)
 
 ## Intermediate Usage
 
@@ -76,7 +78,7 @@ on Pandas DataFrames.
 
 Let's say we have a list of database columns:
 
-| Qualified Column Name        | Type           | Table   |
+| Column Name        | Type           | Table   |
 |------------------------------|----------------|---------|
 | user.email                   | text           | user    |
 | user.touch_count             | integer        | user    |
@@ -100,11 +102,15 @@ And we want to associate them to these front-end fields:
 | Number of Purchases          | number   |
 | Freetext Notes               | string   |
 
+We can do that by passing in the two dataframes. (The columns could be explicitly specified, but by default it uses the first column.)
+Since some of the columns and fields *don't* match to anything, we'll also specify a threshold so that only "pretty good" matches or better
+will be returned.
+
 ```python
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4)
 ```
 
-|   Left |   Right |   Similarity | Qualified Column Name   | Type_left      | Table   | Field Name                   | Type_right   |
+|   Left |   Right |   Similarity | Column Name             | Type_left      | Table   | Field Name                   | Type_right   |
 |--------|---------|--------------|-------------------------|----------------|---------|------------------------------|--------------|
 |      1 |       0 |     0.471828 | user.touch_count        | integer        | user    | Recent Touch Events          | number       |
 |      2 |       3 |     0.819823 | user.propensity_score   | numeric        | user    | User Propensity Score        | number       |
@@ -113,15 +119,14 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4)
 |      5 |       5 |     0.606886 | account.status_code     | char(1)        | account | Account Status               | string       |
 |      6 |       2 |     0.556893 | account.age             | integer        | account | Account Age (Years)          | number       |
 
-This only shows the single best match above a threshold of 0.4, which is useful if you want reliable, one-to-one matches.
-
-To include rows that didn't match, specify how you want to join: left, right, or outer. (The default is inner.)
+This only shows the single best match above a threshold of 0.4, which is useful if you want reliable, one-to-one matches. To include rows that didn't match
+in the result, specify how you want to join: left, right, or outer. This options works the same was as the `how` option in `pandas.merge()`:
 
 ```python
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer")
 ```
 
-|   Left |   Right |   Similarity | Qualified Column Name        | Type_left      | Table   | Field Name                   | Type_right   |
+|   Left |   Right |   Similarity | Column Name                  | Type_left      | Table   | Field Name                   | Type_right   |
 |--------|---------|--------------|------------------------------|----------------|---------|------------------------------|--------------|
 |      0 |     nan |   nan        | user.email                   | text           | user    | nan                          | nan          |
 |      1 |       0 |     0.471828 | user.touch_count             | integer        | user    | Recent Touch Events          | number       |
@@ -135,7 +140,9 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer")
 |    nan |       7 |   nan        | nan                          | nan            | nan     | Freetext Notes               | string       |
 
 These join types show the missing rows, but they are still orphaned (not joined to anything) because by default the algorithm only takes
-the single best match. To get one-to-many, many-to-one, or many-to-many matches, specify the `allow_many` option: left, right, or both.
+the single best match. These results will show `nan` values (Panda's equivalent of NULL in SQL) for columns on the other side of the join.
+
+To get one-to-many, many-to-one, or many-to-many matches, specify the `allow_many` option: left, right, or both.
 
 ```python
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="both")
@@ -154,9 +161,9 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="b
 |      7 |       6 |     0.665931 | account.total_purchase_count | integer        | account | Number of Purchases          | number       |
 |    nan |       7 |   nan        | nan                          | nan            | nan     | Freetext Notes               | string       |
 
-![One-to-Many Association](https://raw.githubusercontent.com/olooney/jellyjoin/main/images/field_association_many.png)
+![One-to-Many Association](https://raw.githubusercontent.com/olooney/jellyjoin/main/docs/images/field_association_many.png)
 
-Records that don't join to anything on the other side with a similarity greater than the threshold will still be left unjoined.
+Records that don't join to anything on the other side (with a similarity greater than the threshold) will still be left unjoined.
 
 ## Advanced Usage
 
