@@ -9,7 +9,7 @@
 - [ ] embed: to truncate long content?
 - [ ] batch embed calls if too many
 - [ ] refactor to separate files?
-- [ ] unit tests edge cases (empty lists, etc.)
+- [X] unit tests edge cases (empty lists, etc.)
 - [ ] unit tests for plots?
 - [ ] enforce / validate types
 - [ ] support polars?
@@ -19,3 +19,4 @@
 - [ ] allow custom Mahalanobis distances with PSD matrix?
 - [ ] PyPI badge
 - [ ] Black or ruff
+- [ ] suffix options, similar to pd.merge()
