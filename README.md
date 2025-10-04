@@ -7,7 +7,11 @@ Join dataframes or lists based on semantic similarity.
 - PyPI https://pypi.org/project/jellyjoin/
 - GitHub: https://github.com/olooney/jellyjoin
 
- [![PyPI](https://img.shields.io/pypi/v/jellyjoin.svg)](https://pypi.org/project/jellyjoin/) ![License](https://img.shields.io/pypi/l/jellyjoin.svg) ![Python Versions](https://img.shields.io/pypi/pyversions/jellyjoin.svg)
+ ![PyPI](https://img.shields.io/pypi/v/jellyjoin.svg)
+ ![License](https://img.shields.io/pypi/l/jellyjoin.svg)
+ ![Python Versions](https://img.shields.io/pypi/pyversions/jellyjoin.svg)
+
+![Github Tests](https://github.com/olooney/jellyjoin/actions/workflows/tests.yaml/badge.svg)
 
 ## About
 
@@ -152,13 +156,13 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="b
 
 Records that don't join to anything on the other side (with a similarity greater than the threshold) will still be left unjoined.
 
+
 ## Advanced Usage
 
 TODO: Configuring custom similarity strategies
+
 TODO: Hungarian Algorithm.
 
-
----
 
 ## Development
 

@@ -243,7 +243,7 @@ def jellyjoin(
         left_column: Column name to use for left dataframe (required if left is DataFrame)
         right_column: Column name to use for right dataframe (required if right is DataFrame)
         threshold: Minimum similarity score to consider a match (default: 0.5)
-        allow_many:
+        allow_many: Find one-to-many assocations
 
     Returns:
         DataFrame with joined data sorted by (Left, Right) indices

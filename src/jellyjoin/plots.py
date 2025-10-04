@@ -2,11 +2,18 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+__all__ = [
+    "plot_similarity_matrix",
+    "plot_associations",
+]
+
 
 def plot_similarity_matrix(
     similarity_matrix, figsize=(6, 6), left_labels=None, right_labels=None
 ):
-
+    """
+    Displays a similarity matrix as a heatmap with labels.
+    """
     # Display the similarity matrix visually
     fig, ax = plt.subplots(figsize=figsize)
     im = ax.imshow(similarity_matrix, cmap="Blues")
@@ -54,7 +61,10 @@ def plot_associations(
     left_column="Left Value",
     right_column="Right Value",
 ):
-    """ """
+    """
+    Displays a "connect-the-dots" style plot showing labeled dots
+    on the left and right connected by lines.
+    """
     # Extract left and right labels and indices
     left_labels = association_df[left_column]
     right_labels = association_df[right_column]

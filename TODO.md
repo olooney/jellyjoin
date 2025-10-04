@@ -18,5 +18,6 @@
 - [ ] biclustering approach?
 - [ ] allow custom Mahalanobis distances with PSD matrix?
 - [ ] PyPI badge
-- [ ] Black or ruff
+- [X] Black or ruff
 - [ ] suffix options, similar to pd.merge()
+- [X] github test badge
