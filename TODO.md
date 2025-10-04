@@ -1,0 +1,21 @@
+
+- [ ] Other Embedding Models
+- [ ] Local HuggingFace models?
+- [ ] Ollama embedding models
+- [X] README better examples
+- [ ] README custom similarity strategy
+- [ ] Refactor to Jelly class?
+- [ ] join option for blocking?
+- [ ] embed: to truncate long content?
+- [ ] batch embed calls if too many
+- [ ] refactor to separate files?
+- [ ] unit tests edge cases (empty lists, etc.)
+- [ ] unit tests for plots?
+- [ ] enforce / validate types
+- [ ] support polars?
+- [ ] Command line?
+- [ ] Dedupe / clustering?
+- [ ] biclustering approach?
+- [ ] allow custom Mahalanobis distances with PSD matrix?
+- [ ] PyPI badge
+- [ ] Black or ruff

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from abc import ABC, abstractmethod
+from importlib.metadata import version, PackageNotFoundError
 
 from .similarity import damerau_levenshtein_similarity
 from .similarity import get_similarity_function
@@ -15,7 +16,13 @@ __all__ = [
     "jellyjoin",
 ]
 
-__version__ = "0.1.2"
+
+# set the version dynamically
+try:
+    __version__ = version("jellyjoin")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
+
 
 identity = lambda x: x
 
@@ -49,9 +56,13 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         """
         Compute an NxM matrix of similarities using an embedding model.
         """
-        if self.preprocessor is not identity:
-            left_texts = [ self.preprocessor(text) for text in left_texts ]
-            right_texts = [ self.preprocessor(text) for text in right_texts ]
+        left_texts = [ self.preprocessor(text) for text in left_texts ]
+        right_texts = [ self.preprocessor(text) for text in right_texts ]
+
+        if not left_texts:
+            return np.zeros((0, len(right_texts)))
+        elif not right_texts:
+            return np.zeros((len(left_texts), 0))
         
         # compute embeddings
         left_embeddings = self.embed(left_texts)

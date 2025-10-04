@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 import pandas as pd
@@ -65,6 +66,10 @@ right_df = pd.DataFrame({
     ]
 })
 
+def test_version():
+    assert re.match(r"^\d+\.\d+\.\d+$", jellyjoin.__version__)
+    assert jellyjoin.__version__ > "0.0.0"
+
 
 def test_pairwise_similarity_strategy_defaults():
     strategy = jellyjoin.PairwiseSimilarityStrategy()
@@ -109,6 +114,25 @@ def test_pairwise_strategy_square():
     assert np.all(matrix >= 0.0) and np.all(matrix <= 1.0)
     assert np.all(np.isclose(matrix, matrix.T))
     assert np.all(np.isclose(np.diag(matrix), 1.0))
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ([], ["X"]),      # left empty
+        (["X"], []),      # right empty
+        ([], []),         # both empty
+    ],
+)
+def test_jellyjoin_empty(left, right):
+    examples = [
+        ([], ["X"]),
+        (["X"], []),
+        ([], []),
+    ]
+    for left, right in examples:
+        df = jellyjoin.jellyjoin(left, right)
+        assert df.columns.tolist() == ['Left', 'Right', 'Similarity', 'Left Value', 'Right Value']
+        assert len(df) == 0
 
 def test_jellyjoin_with_lists():
     df = jellyjoin.jellyjoin(left_sections, right_sections)
