@@ -19,8 +19,8 @@ def hamming_similarity(x: str, y: str) -> float:
     .. math::
         1 - \\frac{d_{H}(x, y)}{\\max(|x|, |y|)}
 
-    where :math:`d_{H}` is the Hamming distance. This measure 
-    assumes both strings are of equal length; if not, the shorter 
+    where :math:`d_{H}` is the Hamming distance. This measure
+    assumes both strings are of equal length; if not, the shorter
     one is conceptually padded to match.
 
     Parameters
@@ -75,7 +75,7 @@ def damerau_levenshtein_similarity(x: str, y: str) -> float:
     .. math::
         1 - \\frac{d_{DL}(x, y)}{\\max(|x|, |y|)}
 
-    where :math:`d_{DL}` is the Damerau-Levenshtein distance 
+    where :math:`d_{DL}` is the Damerau-Levenshtein distance
     (edit distance with transpositions).
 
     Parameters
@@ -98,8 +98,8 @@ def jaro_similarity(x: str, y: str) -> float:
     """
     Compute the Jaro similarity between two strings.
 
-    The Jaro similarity accounts for character transpositions and 
-    common characters within a matching window. It is often used in 
+    The Jaro similarity accounts for character transpositions and
+    common characters within a matching window. It is often used in
     record linkage and duplicate detection.
 
     Parameters
@@ -121,8 +121,8 @@ def jaro_winkler_similarity(x: str, y: str) -> float:
     """
     Compute the Jaro-Winkler similarity between two strings.
 
-    The Jaro-Winkler similarity extends the Jaro similarity by 
-    giving more weight to common prefixes, making it well-suited 
+    The Jaro-Winkler similarity extends the Jaro similarity by
+    giving more weight to common prefixes, making it well-suited
     for short strings such as names.
 
     Parameters
@@ -148,14 +148,16 @@ FUNCTION_MAP = {
     "jaro": jaro_similarity,
     "jaro_winkler": jaro_winkler_similarity,
 }
+
+
 def get_similarity_function(
-    function: Union[str, Callable[[str, str], float]]
+    function: Union[str, Callable[[str, str], float]],
 ) -> Callable[[str, str], float]:
     """
     Resolve a string identifier to a string similarity function.
 
-    The input name is normalized by converting to lowercase, 
-    stripping leading and trailing whitespace, and replacing 
+    The input name is normalized by converting to lowercase,
+    stripping leading and trailing whitespace, and replacing
     hyphens with underscores.
 
     Parameters

@@ -26,9 +26,12 @@ except PackageNotFoundError:
 
 identity = lambda x: x
 
+
 class SimilarityStrategy(ABC):
     @abstractmethod
-    def __call__(self, left_texts: Iterable[str], right_texts: Iterable[str]) -> np.ndarray:
+    def __call__(
+        self, left_texts: Iterable[str], right_texts: Iterable[str]
+    ) -> np.ndarray:
         """
         Computes the NxM similarity matrix between N left_texts and M right_texts.
         """
@@ -44,7 +47,7 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
     ):
         """
         Uses an OpenAI embedding model (text-embedding-3-large by default) to
-        calculate the embeddings, then uses a matrix product to quickly 
+        calculate the embeddings, then uses a matrix product to quickly
         calculate all cosine similarities. OpenAI embeddings are already
         normalized, so this inner product is the same as the cosine similarity.
         """
@@ -52,22 +55,24 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         self.embedding_model = embedding_model
         self.preprocessor = preprocessor
 
-    def __call__(self, left_texts: Iterable[str], right_texts: Iterable[str]) -> np.ndarray:
+    def __call__(
+        self, left_texts: Iterable[str], right_texts: Iterable[str]
+    ) -> np.ndarray:
         """
         Compute an NxM matrix of similarities using an embedding model.
         """
-        left_texts = [ self.preprocessor(text) for text in left_texts ]
-        right_texts = [ self.preprocessor(text) for text in right_texts ]
+        left_texts = [self.preprocessor(text) for text in left_texts]
+        right_texts = [self.preprocessor(text) for text in right_texts]
 
         if not left_texts:
             return np.zeros((0, len(right_texts)))
         elif not right_texts:
             return np.zeros((len(left_texts), 0))
-        
+
         # compute embeddings
         left_embeddings = self.embed(left_texts)
         right_embeddings = self.embed(right_texts)
-        
+
         # calculate similarity matrix
         similarity_matrix = left_embeddings @ right_embeddings.T
 
@@ -82,7 +87,7 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
             input=texts,
             encoding_format="float",
         )
-        vectors = [ np.array(e.embedding) for e in response.data ]
+        vectors = [np.array(e.embedding) for e in response.data]
         return np.stack(vectors)
 
 
@@ -107,7 +112,7 @@ class PairwiseSimilarityStrategy(SimilarityStrategy):
         """
         Compute an NxM matrix of similarities using the specified preprocessor and similarity function.
         """
-        size= (len(left_texts), len(right_texts))
+        size = (len(left_texts), len(right_texts))
         similarity_matrix = np.zeros(size)
 
         for row, left_text in enumerate(left_texts):
@@ -126,13 +131,14 @@ def get_automatic_similarity_strategy() -> SimilarityStrategy:
     """
     try:
         import openai
+
         # will usually succeed if OPENAI_API_KEY is defined
         client = openai.OpenAI()
         return OpenAIEmbeddingSimilarityStrategy(client)
     except:
         pass
     return PairwiseSimilarityStrategy()
-        
+
 
 def find_extra_assignments(similarity_matrix, unassigned, threshold, transpose=False):
     """
@@ -141,7 +147,7 @@ def find_extra_assignments(similarity_matrix, unassigned, threshold, transpose=F
     """
     if transpose:
         similarity_matrix = similarity_matrix.T
-    
+
     extra_assignments = []
     for row in unassigned:
         column = np.argmax(similarity_matrix[row, :])
@@ -150,43 +156,37 @@ def find_extra_assignments(similarity_matrix, unassigned, threshold, transpose=F
             if transpose:
                 row, column = column, row
             extra_assignments.append((row, column, score))
-            
+
     return extra_assignments
 
 
 def all_extra_assignments(
-    allow_many:str,
+    allow_many: str,
     assignments: np.ndarray,
     similarity_matrix: np.ndarray,
-    threshold: float
+    threshold: float,
 ) -> list[int]:
     """
     Finds all extra assignments left, right, or both. This allows for
     many-to-one, one-to-many, and many-to-many matches respectively.
     """
     new_assignments = []
-    
+
     n_left, n_right = similarity_matrix.shape
-    
+
     # For each unassigned right item, find best left match if above threshold
     if allow_many in ["right", "both"]:
         unassigned_right = list(set(range(n_right)) - set(a[1] for a in assignments))
         extra_assignments = find_extra_assignments(
-            similarity_matrix,
-            unassigned_right,
-            threshold,
-            transpose=True
+            similarity_matrix, unassigned_right, threshold, transpose=True
         )
         new_assignments.extend(extra_assignments)
-    
+
     # For each unassigned left item, find best right match if above threshold
     if allow_many in ["left", "both"]:
         unassigned_left = list(set(range(n_left)) - set(a[0] for a in assignments))
         extra_assignments = find_extra_assignments(
-            similarity_matrix,
-            unassigned_left,
-            threshold,
-            transpose=False
+            similarity_matrix, unassigned_left, threshold, transpose=False
         )
         new_assignments.extend(extra_assignments)
     return new_assignments
@@ -196,7 +196,7 @@ def double_join(
     left: pd.DataFrame,
     middle: pd.DataFrame,
     right: pd.DataFrame,
-    how: Literal["inner", "left", "right", "outer"]
+    how: Literal["inner", "left", "right", "outer"],
 ) -> pd.DataFrame:
     """
     Joins three dataframes together, with the associations in the middle.
@@ -214,8 +214,8 @@ def double_join(
     return intermediate_df.merge(
         right.reset_index(drop=True),
         left_on="Right",
-        right_index=True, 
-        suffixes=('_left', '_right'),
+        right_index=True,
+        suffixes=("_left", "_right"),
         how=right_how,
     )
 
@@ -227,26 +227,26 @@ def jellyjoin(
     right_column: Optional[str] = None,
     similarity_strategy: Optional[Callable] = None,
     threshold: float = 0.0,
-    allow_many:  Literal[None, "left", "right", "both"] = None,
+    allow_many: Literal[None, "left", "right", "both"] = None,
     how: Literal["inner", "left", "right", "outer"] = "inner",
 ) -> pd.DataFrame:
     """
     Join dataframes or lists based on semantic similarity.
-    
+
     Args:
         left: Left dataframe or iterable of strings
         right: Right dataframe or iterable of strings
         left_column: Column name to use for left dataframe (required if left is DataFrame)
         right_column: Column name to use for right dataframe (required if right is DataFrame)
         threshold: Minimum similarity score to consider a match (default: 0.5)
-        allow_many: 
-    
+        allow_many:
+
     Returns:
         DataFrame with joined data sorted by (Left, Right) indices
     """
     if similarity_strategy is None:
         similarity_strategy = get_automatic_similarity_strategy()
-    
+
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
         left = pd.DataFrame({left_column or "Left Value": list(left)})
@@ -258,37 +258,31 @@ def jellyjoin(
         left_column = left.columns[0]
     if not right_column:
         right_column = right.columns[0]
-    
+
     # Calculate similarity matrix
     similarity_matrix = similarity_strategy(left[left_column], right[right_column])
-    
+
     # Find optimal assignments using Hungarian algorithm
     row_indices, col_indices = linear_sum_assignment(-similarity_matrix)
     scores = similarity_matrix[row_indices, col_indices]
-    
+
     # Filter by threshold
     mask = scores > threshold
     assignments = list(zip(row_indices[mask], col_indices[mask], scores[mask]))
-    
+
     if allow_many:
         extra_assignments = all_extra_assignments(
-            allow_many,
-            assignments,
-            similarity_matrix,
-            threshold
+            allow_many, assignments, similarity_matrix, threshold
         )
         assignments.extend(extra_assignments)
-    
+
     # Create dataframe from assignments
     assignment_df = pd.DataFrame(assignments, columns=["Left", "Right", "Similarity"])
 
     # join all three data frames together
     result = double_join(left, assignment_df, right, how)
-    
+
     # Sort and reset index
     result = result.sort_values(by=["Left", "Right"]).reset_index(drop=True)
-    
+
     return result
-
-
-
