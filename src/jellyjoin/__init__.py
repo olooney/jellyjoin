@@ -30,7 +30,9 @@ identity = lambda x: x
 class SimilarityStrategy(ABC):
     @abstractmethod
     def __call__(
-        self, left_texts: Iterable[str], right_texts: Iterable[str]
+        self,
+        left_texts: Iterable[str],
+        right_texts: Iterable[str],
     ) -> np.ndarray:
         """
         Computes the NxM similarity matrix between N left_texts and M right_texts.
@@ -56,7 +58,9 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         self.preprocessor = preprocessor
 
     def __call__(
-        self, left_texts: Iterable[str], right_texts: Iterable[str]
+        self,
+        left_texts: Iterable[str],
+        right_texts: Iterable[str],
     ) -> np.ndarray:
         """
         Compute an NxM matrix of similarities using an embedding model.
