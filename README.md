@@ -161,7 +161,7 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="b
 |      7 |       6 |     0.665931 | account.total_purchase_count | integer        | account | Number of Purchases          | number       |
 |    nan |       7 |   nan        | nan                          | nan            | nan     | Freetext Notes               | string       |
 
-![One-to-Many Association](https://raw.githubusercontent.com/olooney/jellyjoin/main/docs/images/field_association_many.png)
+![One-to-Many Association](https://raw.githubusercontent.com/olooney/jellyjoin/main/docs/images/association_many.png)
 
 Records that don't join to anything on the other side (with a similarity greater than the threshold) will still be left unjoined.
 
