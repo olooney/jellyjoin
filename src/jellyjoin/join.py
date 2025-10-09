@@ -1,4 +1,6 @@
 from typing import Union, List, Optional, Iterable, Any, Tuple, Literal, Callable
+from collections.abc import Collection
+
 import pandas as pd
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -102,8 +104,8 @@ def triple_join(
 
 
 def jellyjoin(
-    left: Union[pd.DataFrame, Iterable],
-    right: Union[pd.DataFrame, Iterable],
+    left: Union[pd.DataFrame, Collection],
+    right: Union[pd.DataFrame, Collection],
     left_on: Optional[str] = None,
     right_on: Optional[str] = None,
     similarity_strategy: Optional[SimilarityStrategyCallable] = None,
@@ -115,11 +117,11 @@ def jellyjoin(
     Join dataframes or lists based on semantic similarity.
 
     Args:
-        left: Left dataframe or iterable of strings
-        right: Right dataframe or iterable of strings
-        left_on: Column name to use for left dataframe (required if left is DataFrame)
-        right_on: Column name to use for right dataframe (required if right is DataFrame)
-        threshold: Minimum similarity score to consider a match (default: 0.5)
+        left: Left DataFrame or Collection of strings
+        right: Right DataFrame or Collection of strings
+        left_on: Column name to use for left dataframe
+        right_on: Column name to use for right dataframe
+        threshold: Minimum similarity score to consider a match (default: 0.0)
         allow_many: Find one-to-many assocations
 
     Returns:

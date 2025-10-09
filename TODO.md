@@ -11,9 +11,10 @@
 - [X] refactor to separate files?
 - [X] unit tests edge cases (empty lists, etc.)
 - [ ] unit tests for plots?
+- [X] static type annotations
 - [ ] enforce / validate types
 - [ ] support polars?
-- [ ] Command line?
+- [ ] CLI tool
 - [ ] Dedupe / clustering?
 - [ ] biclustering approach?
 - [ ] allow custom Mahalanobis distances with PSD matrix?
