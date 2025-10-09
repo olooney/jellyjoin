@@ -3,15 +3,25 @@ import pandas as pd
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from .strategy import SimilarityStrategyCallable, get_automatic_similarity_strategy
+from .strategy import get_automatic_similarity_strategy
+from .type_definitions import SimilarityStrategyCallable
 
 
 __all__ = [
     "jellyjoin",
 ]
 
+HowLiteral = Literal["inner", "left", "right", "outer"]
+AllowManyLiteral = Literal["neither", "left", "right", "both"]
+AssignmentList = List[Tuple[int, int, float]]
 
-def find_extra_assignments(similarity_matrix, unassigned, threshold, transpose=False):
+
+def find_extra_assignments(
+    similarity_matrix: np.ndarray,
+    unassigned: Iterable[int],
+    threshold: float,
+    transpose: bool = False,
+) -> AssignmentList:
     """
     Scans the similarity matrix for matches that are currently unassigned but
     above the threshold.
@@ -19,10 +29,10 @@ def find_extra_assignments(similarity_matrix, unassigned, threshold, transpose=F
     if transpose:
         similarity_matrix = similarity_matrix.T
 
-    extra_assignments = []
+    extra_assignments: AssignmentList = []
     for row in unassigned:
-        column = np.argmax(similarity_matrix[row, :])
-        score = similarity_matrix[row, column]
+        column = int(np.argmax(similarity_matrix[row, :]))
+        score = float(similarity_matrix[row, column])
         if score > threshold:
             if transpose:
                 row, column = column, row
@@ -32,11 +42,11 @@ def find_extra_assignments(similarity_matrix, unassigned, threshold, transpose=F
 
 
 def all_extra_assignments(
-    allow_many: str,
-    assignments: np.ndarray,
+    allow_many: AllowManyLiteral,
+    assignments: AssignmentList,
     similarity_matrix: np.ndarray,
     threshold: float,
-) -> list[int]:
+) -> AssignmentList:
     """
     Finds all extra assignments left, right, or both. This allows for
     many-to-one, one-to-many, and many-to-many matches respectively.
@@ -67,7 +77,7 @@ def triple_join(
     left: pd.DataFrame,
     middle: pd.DataFrame,
     right: pd.DataFrame,
-    how: Literal["inner", "left", "right", "outer"],
+    how: HowLiteral,
 ) -> pd.DataFrame:
     """
     Joins three dataframes together, with the associations in the middle.
@@ -94,12 +104,12 @@ def triple_join(
 def jellyjoin(
     left: Union[pd.DataFrame, Iterable],
     right: Union[pd.DataFrame, Iterable],
-    left_column: Optional[str] = None,
-    right_column: Optional[str] = None,
-    similarity_strategy: SimilarityStrategyCallable = None,
+    left_on: Optional[str] = None,
+    right_on: Optional[str] = None,
+    similarity_strategy: Optional[SimilarityStrategyCallable] = None,
     threshold: float = 0.0,
-    allow_many: Literal[None, "left", "right", "both"] = None,
-    how: Literal["inner", "left", "right", "outer"] = "inner",
+    allow_many: AllowManyLiteral = "neither",
+    how: HowLiteral = "inner",
 ) -> pd.DataFrame:
     """
     Join dataframes or lists based on semantic similarity.
@@ -107,8 +117,8 @@ def jellyjoin(
     Args:
         left: Left dataframe or iterable of strings
         right: Right dataframe or iterable of strings
-        left_column: Column name to use for left dataframe (required if left is DataFrame)
-        right_column: Column name to use for right dataframe (required if right is DataFrame)
+        left_on: Column name to use for left dataframe (required if left is DataFrame)
+        right_on: Column name to use for right dataframe (required if right is DataFrame)
         threshold: Minimum similarity score to consider a match (default: 0.5)
         allow_many: Find one-to-many assocations
 
@@ -120,18 +130,18 @@ def jellyjoin(
 
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
-        left = pd.DataFrame({left_column or "Left Value": list(left)})
+        left = pd.DataFrame({left_on or "Left Value": list(left)})
     if not isinstance(right, pd.DataFrame):
-        right = pd.DataFrame({right_column or "Right Value": list(right)})
+        right = pd.DataFrame({right_on or "Right Value": list(right)})
 
     # default to the first column if not explicitly named
-    if not left_column:
-        left_column = left.columns[0]
-    if not right_column:
-        right_column = right.columns[0]
+    if not left_on:
+        left_on = left.columns[0]
+    if not right_on:
+        right_on = right.columns[0]
 
     # Calculate similarity matrix
-    similarity_matrix = similarity_strategy(left[left_column], right[right_column])
+    similarity_matrix = similarity_strategy(left[left_on], right[right_on])
 
     # Find optimal assignments using Hungarian algorithm
     row_indices, col_indices = linear_sum_assignment(-similarity_matrix)
@@ -141,7 +151,7 @@ def jellyjoin(
     mask = scores > threshold
     assignments = list(zip(row_indices[mask], col_indices[mask], scores[mask]))
 
-    if allow_many:
+    if allow_many != "neither":
         extra_assignments = all_extra_assignments(
             allow_many, assignments, similarity_matrix, threshold
         )

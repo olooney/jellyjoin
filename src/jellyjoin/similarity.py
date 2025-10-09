@@ -1,5 +1,6 @@
 from typing import Callable, Union
 import jellyfish
+from .type_definitions import SimilarityCallable, SimilarityIdentifier
 
 __all__ = [
     "hamming_similarity",
@@ -151,8 +152,8 @@ FUNCTION_MAP = {
 
 
 def get_similarity_function(
-    function: Union[str, Callable[[str, str], float]],
-) -> Callable[[str, str], float]:
+    function: Union[None, str, SimilarityCallable],
+) -> SimilarityCallable:
     """
     Resolve a string identifier to a string similarity function.
 
@@ -175,6 +176,12 @@ def get_similarity_function(
     KeyError
         If the name does not correspond to a known similarity function.
     """
+
+    # a reasonably good generic default
+    if function is None:
+        return damerau_levenshtein_similarity
+
+    # pass through the callable
     if callable(function):
         return function
 

@@ -8,7 +8,7 @@
 - [ ] join option for blocking?
 - [ ] embed: to truncate long content?
 - [ ] batch embed calls if too many
-- [ ] refactor to separate files?
+- [X] refactor to separate files?
 - [X] unit tests edge cases (empty lists, etc.)
 - [ ] unit tests for plots?
 - [ ] enforce / validate types
@@ -17,7 +17,7 @@
 - [ ] Dedupe / clustering?
 - [ ] biclustering approach?
 - [ ] allow custom Mahalanobis distances with PSD matrix?
-- [ ] PyPI badge
-- [X] Black or ruff
+- [x] PyPI badges
+- [X] Black
 - [ ] suffix options, similar to pd.merge()
 - [X] github test badge

@@ -2,11 +2,15 @@ from importlib.metadata import version, PackageNotFoundError
 
 from .strategy import (
     SimilarityStrategy,
-    SimilarityStrategyCallable,
     OpenAIEmbeddingSimilarityStrategy,
     PairwiseSimilarityStrategy,
 )
 from .join import jellyjoin
+from .type_definitions import (
+    SimilarityStrategyCallable,
+    SimilarityCallable,
+    PreprocessorCallable,
+)
 
 __all__ = [
     "__version__",

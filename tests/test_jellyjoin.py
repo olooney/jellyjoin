@@ -163,8 +163,8 @@ def test_jellyjoin_with_dataframes_all_hows():
         df = jellyjoin.jellyjoin(
             left_df,
             right_df,
-            left_column="API Path",
-            right_column="UI Field Name",
+            left_on="API Path",
+            right_on="UI Field Name",
             threshold=0.4,
             how=how,
         )

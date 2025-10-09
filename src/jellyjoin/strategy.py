@@ -1,43 +1,35 @@
-from typing import (
-    Union,
-    List,
-    Optional,
-    Iterable,
-    Any,
-    Tuple,
-    Literal,
-    Callable,
-    TypeAlias,
-)
+from typing import Union, List, Optional, Any, Tuple, Literal, Callable, TypeAlias
 import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 
 from .similarity import damerau_levenshtein_similarity
 from .similarity import get_similarity_function
+from .type_definitions import (
+    PreprocessorCallable,
+    SimilarityCallable,
+    SimilarityIdentifier,
+)
 
 __all__ = [
-    "SimilarityStrategyInterface",
     "SimilarityStrategy",
     "OpenAIEmbeddingSimilarityStrategy",
     "PairwiseSimilarityStrategy",
 ]
 
-# identity function used as a default argument to several functions
-identity = lambda x: x
 
-# type description of what a "similarity strategy" looks like
-SimilarityStrategyCallable: TypeAlias = Callable[
-    [Iterable[str], Iterable[str]], np.ndarray
-]
+# identity function used as a default argument to several functions
+def identity(x: str) -> str:
+    return x
 
 
 class SimilarityStrategy(ABC):
     @abstractmethod
     def __call__(
         self,
-        left_texts: Iterable[str],
-        right_texts: Iterable[str],
+        left_texts: Collection[str],
+        right_texts: Collection[str],
     ) -> np.ndarray:
         """
         Computes the NxM similarity matrix between N left_texts and M right_texts.
@@ -50,7 +42,7 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         self,
         client,
         embedding_model: str = "text-embedding-3-large",
-        preprocessor: Optional[Callable[[str], str]] = identity,
+        preprocessor: PreprocessorCallable = identity,
     ):
         """
         Uses an OpenAI embedding model (text-embedding-3-large by default) to
@@ -64,8 +56,8 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
 
     def __call__(
         self,
-        left_texts: Iterable[str],
-        right_texts: Iterable[str],
+        left_texts: Collection[str],
+        right_texts: Collection[str],
     ) -> np.ndarray:
         """
         Compute an NxM matrix of similarities using an embedding model.
@@ -103,21 +95,23 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
 class PairwiseSimilarityStrategy(SimilarityStrategy):
     def __init__(
         self,
-        similarity_func: Callable[[str, str], float] = None,
-        preprocessor: Optional[Callable[[str], str]] = identity,
+        similarity_function: SimilarityIdentifier = None,
+        preprocessor: PreprocessorCallable = identity,
     ):
         """
         preprocessor: A callable that preprocesses each input string (e.g., soundex or metaphone).
         similarity_func: A callable that computes similarity between two strings (e.g., jellyfish.jaro_winkler).
         """
         self.preprocessor = preprocessor
+        self.similarity_function: SimilarityCallable = get_similarity_function(
+            similarity_function
+        )
 
-        if similarity_func is None:
-            self.similarity_func = damerau_levenshtein_similarity
-        else:
-            self.similarity_func = get_similarity_function(similarity_func)
-
-    def __call__(self, left_texts: List[str], right_texts: List[str]) -> np.ndarray:
+    def __call__(
+        self,
+        left_texts: Collection[str],
+        right_texts: Collection[str],
+    ) -> np.ndarray:
         """
         Compute an NxM matrix of similarities using the specified preprocessor and similarity function.
         """
@@ -128,7 +122,7 @@ class PairwiseSimilarityStrategy(SimilarityStrategy):
             left = self.preprocessor(left_text)
             for column, right_text in enumerate(right_texts):
                 right = self.preprocessor(right_text)
-                similarity_matrix[row, column] = self.similarity_func(right, left)
+                similarity_matrix[row, column] = self.similarity_function(right, left)
 
         return similarity_matrix
 
