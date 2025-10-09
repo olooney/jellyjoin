@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.2.0"
+version = "0.2.1"
 description = "Utilities for dataset similarity and joins"
 authors = [
     { name = "Oran Looney", email = "olooney@gmail.com" }
