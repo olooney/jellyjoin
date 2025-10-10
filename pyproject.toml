@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.2.2"
+version = "0.2.3"
 description = "Utilities for dataset similarity and joins"
 authors = [
     { name = "Oran Looney", email = "olooney@gmail.com" }
@@ -29,7 +29,7 @@ dependencies = [
     "numpy>=1.26.4",
     "pandas>=2.2.2",
     "scipy>=1.13.0",
-    "tiktoken>0.70",
+    "tiktoken>0.7.0",
 ]
 
 [project.optional-dependencies]
