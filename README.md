@@ -16,7 +16,7 @@ Join dataframes or lists based on semantic similarity.
 ## About
 
 Jellyjoin does "soft joins" based not exact matches, but on approximate similarity. It uses a cost based
-optimization to find the "best" match. It can use older string similarity metrics as well but using a 
+optimization to find the "best" match. It can use older string similarity metrics as well but using a
 embedding model allows semantic similarity to be used and gives very robust and high quality matches.
 
 By default, jellyjoin will attempt to use OpenAI embedding models to calculate similarity if you have the `openai`
@@ -78,7 +78,7 @@ plot_similarity_matrix(similarity_matrix)
 ## Intermediate Usage
 
 Often, though, your records will have multiple fields, so `jellyjoin` is designed to work
-on Pandas DataFrames. 
+on Pandas DataFrames.
 
 Let's say we have a list of database columns:
 

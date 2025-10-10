@@ -34,7 +34,7 @@ def find_extra_assignments(
     for row in unassigned:
         column = int(np.argmax(similarity_matrix[row, :]))
         score = float(similarity_matrix[row, column])
-        if score > threshold:
+        if score >= threshold:
             if transpose:
                 row, column = column, row
             extra_assignments.append((row, column, score))
@@ -149,7 +149,7 @@ def jellyjoin(
     scores = similarity_matrix[row_indices, col_indices]
 
     # Filter by threshold
-    mask = scores > threshold
+    mask = scores >= threshold
     assignments = list(zip(row_indices[mask], col_indices[mask], scores[mask]))
 
     if allow_many != "neither":

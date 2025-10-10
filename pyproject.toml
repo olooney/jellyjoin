@@ -61,4 +61,3 @@ ignore = [
   "E501",  # line length
   "F403",  # wildcard imports
 ]
-

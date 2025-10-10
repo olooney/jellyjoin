@@ -165,7 +165,7 @@ class PairwiseSimilarityStrategy(SimilarityStrategy):
             left = self.preprocessor(left_text)
             for column, right_text in enumerate(right_texts):
                 right = self.preprocessor(right_text)
-                similarity_matrix[row, column] = self.similarity_function(right, left)
+                similarity_matrix[row, column] = self.similarity_function(left, right)
 
         return similarity_matrix
 

@@ -1,5 +1,7 @@
 dist/
 notebooks/
+REVIEW.md
+dump.py
 
 # Byte-compiled / cache files
 __pycache__/
