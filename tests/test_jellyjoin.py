@@ -1,14 +1,13 @@
 import os
 import re
 
+import dotenv
 import numpy as np
 import pandas as pd
 import pytest
-import dotenv
 
 import jellyjoin
 from jellyjoin.similarity import levenshtein_similarity
-
 
 # -----------------------
 # Fixtures

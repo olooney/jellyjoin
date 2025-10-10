@@ -1,13 +1,12 @@
-from typing import Union, List, Optional, Iterable, Any, Tuple, Literal, Callable
 from collections.abc import Collection
+from typing import Iterable, List, Literal, Optional, Tuple, Union
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
 from .strategy import get_automatic_similarity_strategy
 from .type_definitions import SimilarityStrategyCallable
-
 
 __all__ = [
     "jellyjoin",

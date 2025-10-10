@@ -1,6 +1,10 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 25.9.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
     hooks:
-      - id: black
-        args: [src, tests]
+      # Lint and auto-fix issues (imports, static checks, etc.)
+      - id: ruff-check
+        args: [--fix]
+
+      # Format code (Black-compatible)
+      - id: ruff-format

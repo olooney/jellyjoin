@@ -1,5 +1,6 @@
-from typing import Union, List, Optional, Any, Tuple, Literal, Callable, TypeAlias
 from collections.abc import Collection
+from typing import Callable, TypeAlias, Union
+
 import numpy as np
 
 # type descriptions

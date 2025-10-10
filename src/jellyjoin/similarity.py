@@ -1,6 +1,8 @@
-from typing import Callable, Union
+from typing import Union
+
 import jellyfish
-from .type_definitions import SimilarityCallable, SimilarityIdentifier
+
+from .type_definitions import SimilarityCallable
 
 __all__ = [
     "hamming_similarity",

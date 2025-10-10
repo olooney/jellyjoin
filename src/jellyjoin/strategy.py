@@ -1,10 +1,9 @@
-from typing import Union, List, Optional, Any, Tuple, Literal, Callable, TypeAlias
-import pandas as pd
-import numpy as np
 from abc import ABC, abstractmethod
 from collections.abc import Collection
+from typing import List
 
-from .similarity import damerau_levenshtein_similarity
+import numpy as np
+
 from .similarity import get_similarity_function
 from .type_definitions import (
     PreprocessorCallable,
@@ -138,6 +137,6 @@ def get_automatic_similarity_strategy() -> SimilarityStrategy:
         # will usually succeed if OPENAI_API_KEY is defined
         client = openai.OpenAI()
         return OpenAIEmbeddingSimilarityStrategy(client)
-    except:
+    except Exception:
         pass
     return PairwiseSimilarityStrategy()
