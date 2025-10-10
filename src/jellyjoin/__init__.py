@@ -1,32 +1,13 @@
-from importlib.metadata import PackageNotFoundError, version
+import importlib.metadata as _imd
 
-from .join import jellyjoin
-from .strategy import (
-    OpenAIEmbeddingSimilarityStrategy,
-    PairwiseSimilarityStrategy,
-    SimilarityStrategy,
-)
-from .type_definitions import (
-    PreprocessorCallable,
-    SimilarityCallable,
-    SimilarityStrategyCallable,
-)
-
-__all__ = [
-    "__version__",
-    "OpenAIEmbeddingSimilarityStrategy",
-    "PairwiseSimilarityStrategy",
-    "PreprocessorCallable",
-    "SimilarityCallable",
-    "SimilarityStrategy",
-    "SimilarityStrategyCallable",
-    "SimilarityStrategyCallable",
-    "jellyjoin",
-]
-
+from .join import *
+from .similarity import *
+from .strategy import *
 
 # set the version dynamically
 try:
-    __version__ = version("jellyjoin")
-except PackageNotFoundError:
+    __version__ = _imd.version("jellyjoin")
+except _imd.PackageNotFoundError:
     __version__ = "0.0.0"
+
+del _imd

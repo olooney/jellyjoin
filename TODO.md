@@ -6,8 +6,8 @@
 - [ ] README custom similarity strategy
 - [ ] Refactor to Jelly class?
 - [ ] join option for blocking?
-- [ ] embed: to truncate long content?
-- [ ] batch embed calls if too many
+- [X] embed: to truncate long content
+- [X] batch embed calls if too many
 - [X] refactor to separate files?
 - [X] unit tests edge cases (empty lists, etc.)
 - [ ] unit tests for plots?

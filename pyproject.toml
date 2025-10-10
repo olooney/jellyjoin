@@ -29,18 +29,19 @@ dependencies = [
     "numpy>=1.26.4",
     "pandas>=2.2.2",
     "scipy>=1.13.0",
+    "tiktoken>0.70",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit",
-    "python-dotenv",
-    "openai",
     "build",
-    "twine",
-    "black",
-    "pytest",
     "matplotlib>=3.8.4",
+    "openai",
+    "pre-commit",
+    "pytest",
+    "python-dotenv",
+    "ruff",
+    "twine",
 ]
 
 [tool.setuptools.packages.find]
@@ -58,5 +59,6 @@ src = ["src", "tests"]
 select = ["E", "F", "I"]
 ignore = [
   "E501",  # line length
+  "F403",  # wildcard imports
 ]
 

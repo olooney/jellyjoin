@@ -7,16 +7,13 @@ import pandas as pd
 import pytest
 
 import jellyjoin
-from jellyjoin.similarity import levenshtein_similarity
+from jellyjoin import levenshtein_similarity
 
 # -----------------------
 # Fixtures
 # -----------------------
 
-
-@pytest.fixture(scope="session", autouse=True)
-def _load_env() -> None:
-    dotenv.load_dotenv()
+dotenv.load_dotenv()
 
 
 @pytest.fixture()
@@ -241,8 +238,34 @@ def test_jellyjoin_allow_many(left_df, right_df, allow_many):
     assert df["Similarity"].between(0.0, 1.0).all()
 
 
-def test_openai_strategy_if_available(openai_strategy, left_sections, right_sections):
+@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+def test_openai_strategy(openai_strategy, left_sections, right_sections):
     matrix = openai_strategy(left_sections, right_sections)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left_sections), len(right_sections))
     assert np.all(matrix >= 0.0) and np.all(matrix <= 1.0)
+
+
+# too expensive to run all the time...
+@pytest.mark.skipif(True, reason="no API key")
+def test_openai_strategy_batch(openai_strategy):
+    LENGTH = 5000
+    left = ["test"] * LENGTH
+    right = ["testing"]
+    matrix = openai_strategy(left, right)
+    assert matrix.shape == (LENGTH, 1)
+
+
+@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+def test_openai_strategy_truncate(openai_strategy):
+    left = [
+        "x" * 8191,
+        "x" * 9001,
+        "x" * 81910,
+        " ".join(["eight"] * 8191),
+        " ".join(["eight"] * 8192),
+        " ".join(["eight"] * 9001),
+    ]
+    right = ["teen"]
+    matrix = openai_strategy(left, right)
+    assert matrix.shape == (6, 1)

@@ -3,6 +3,8 @@ from collections.abc import Collection
 from typing import List
 
 import numpy as np
+import tiktoken
+from numpy.typing import DTypeLike
 
 from .similarity import get_similarity_function
 from .type_definitions import (
@@ -15,6 +17,7 @@ __all__ = [
     "SimilarityStrategy",
     "OpenAIEmbeddingSimilarityStrategy",
     "PairwiseSimilarityStrategy",
+    "get_automatic_similarity_strategy",
 ]
 
 
@@ -40,8 +43,12 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
     def __init__(
         self,
         client,
-        embedding_model: str = "text-embedding-3-large",
         preprocessor: PreprocessorCallable = identity,
+        embedding_model: str = "text-embedding-3-large",
+        batch_size: int = 2048,
+        max_tokens: int = 8191,
+        encoding: str = "cl100k_base",
+        dtype: DTypeLike = np.float32,
     ):
         """
         Uses an OpenAI embedding model (text-embedding-3-large by default) to
@@ -50,8 +57,12 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         normalized, so this inner product is the same as the cosine similarity.
         """
         self.client = client
-        self.embedding_model = embedding_model
         self.preprocessor = preprocessor
+        self.embedding_model = embedding_model
+        self.batch_size = int(batch_size)
+        self.max_tokens = int(max_tokens)
+        self.encoding = tiktoken.get_encoding(encoding)
+        self.dtype = dtype
 
     def __call__(
         self,
@@ -80,15 +91,48 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
 
     def embed(self, texts: List[str]) -> np.ndarray:
         """
-        Helper function to get embeddings from the OpenAI client.
+        Get embeddings from the OpenAI client in batches of size `self.batch_size`.
         """
-        response = self.client.embeddings.create(
-            model=self.embedding_model,
-            input=texts,
-            encoding_format="float",
-        )
-        vectors = [np.array(e.embedding) for e in response.data]
-        return np.stack(vectors)
+        all_vectors = []
+
+        for i in range(0, len(texts), self.batch_size):
+            raw_batch = texts[i : i + self.batch_size]
+            batch = [self._truncate(text) for text in raw_batch]
+
+            # embedding API call
+            response = self.client.embeddings.create(
+                model=self.embedding_model,
+                input=batch,
+                encoding_format="float",
+            )
+
+            # stack up vectors
+            vectors = [e.embedding for e in response.data]
+            all_vectors.extend(vectors)
+
+        return np.array(all_vectors, dtype=self.dtype)
+
+    def _truncate(
+        self,
+        text: str,
+    ) -> str:
+        """
+        Return the text if it is short enough, otherwise truncate it.
+        """
+        # tokens are always at least one character, so we can short-circuit if
+        # the number of characters is less than max_tokens
+        if len(text) <= self.max_tokens:
+            return text
+
+        tokens = self.encoding.encode(text)
+
+        # we're ok; return a reference to the original string
+        if len(tokens) <= 8191:
+            return text
+
+        # truncate and re-encode to string.
+        truncated = tokens[:8191]
+        return self.encoding.decode(truncated)
 
 
 class PairwiseSimilarityStrategy(SimilarityStrategy):
