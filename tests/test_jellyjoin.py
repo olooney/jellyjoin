@@ -257,6 +257,19 @@ def test_openai_strategy_batch(openai_strategy):
 
 
 @pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+def test_openai_strategy_small_batch(openai_client):
+    LENGTH = 5
+    strategy = jellyjoin.OpenAIEmbeddingSimilarityStrategy(
+        openai_client,
+        batch_size=2,
+    )
+    left = ["test"] * LENGTH
+    right = ["testing"]
+    matrix = strategy(left, right)
+    assert matrix.shape == (LENGTH, 1)
+
+
+@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
 def test_openai_strategy_truncate(openai_strategy):
     left = [
         "x" * 8191,
@@ -269,3 +282,10 @@ def test_openai_strategy_truncate(openai_strategy):
     right = ["teen"]
     matrix = openai_strategy(left, right)
     assert matrix.shape == (6, 1)
+
+
+@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+def test_openai_strategy_caching():
+    strategy1 = jellyjoin.get_automatic_similarity_strategy()
+    strategy2 = jellyjoin.get_automatic_similarity_strategy()
+    assert strategy1 is strategy2

@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Collection
 from typing import Iterable, List, Literal, Optional, Tuple, Union
 
@@ -12,6 +13,9 @@ __all__ = [
     "jellyjoin",
 ]
 
+logger = logging.getLogger(__name__)
+
+# types
 HowLiteral = Literal["inner", "left", "right", "outer"]
 AllowManyLiteral = Literal["neither", "left", "right", "both"]
 AssignmentList = List[Tuple[int, int, float]]
@@ -58,6 +62,7 @@ def all_extra_assignments(
 
     # For each unassigned right item, find best left match if above threshold
     if allow_many in ["right", "both"]:
+        logger.debug("Searching for extra right (one-to-many) assignments.")
         unassigned_right = list(set(range(n_right)) - set(a[1] for a in assignments))
         extra_assignments = find_extra_assignments(
             similarity_matrix, unassigned_right, threshold, transpose=True
@@ -66,6 +71,7 @@ def all_extra_assignments(
 
     # For each unassigned left item, find best right match if above threshold
     if allow_many in ["left", "both"]:
+        logger.debug("Searching for extra left (many-to-one) assignments.")
         unassigned_left = list(set(range(n_left)) - set(a[0] for a in assignments))
         extra_assignments = find_extra_assignments(
             similarity_matrix, unassigned_left, threshold, transpose=False
@@ -145,6 +151,7 @@ def jellyjoin(
     similarity_matrix = similarity_strategy(left[left_on], right[right_on])
 
     # Find optimal assignments using Hungarian algorithm
+    logger.debug("Solving assignment problem for %s matrix.", similarity_matrix.shape)
     row_indices, col_indices = linear_sum_assignment(-similarity_matrix)
     scores = similarity_matrix[row_indices, col_indices]
 

@@ -1,13 +1,18 @@
 
+
+- [X] loggings and warnings
+- [X] cache openai client in automatic mode
 - [ ] Other Embedding Models
-- [ ] Local HuggingFace models?
-- [ ] Ollama embedding models
+    - [ ] Local HuggingFace models?
+    - [ ] Ollama embedding models
 - [X] README better examples
 - [ ] README custom similarity strategy
 - [ ] Refactor to Jelly class?
 - [ ] join option for blocking?
 - [X] embed: to truncate long content
 - [X] batch embed calls if too many
+- [X] test batching
+- [X] retry with exponential backoff?
 - [X] refactor to separate files?
 - [X] unit tests edge cases (empty lists, etc.)
 - [ ] unit tests for plots?

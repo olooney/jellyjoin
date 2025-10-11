@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 from typing import List
@@ -19,6 +20,14 @@ __all__ = [
     "PairwiseSimilarityStrategy",
     "get_automatic_similarity_strategy",
 ]
+
+
+logger = logging.getLogger(__name__)
+
+
+# global used to cache the automatic strategy to prevent instantiating a new
+# OpenAI client for every call.
+cached_strategy = None
 
 
 # identity function used as a default argument to several functions
@@ -100,6 +109,7 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
             batch = [self._truncate(text) for text in raw_batch]
 
             # embedding API call
+            logger.debug("Calling OpenAI embeddings API with %d strings.", len(batch))
             response = self.client.embeddings.create(
                 model=self.embedding_model,
                 input=batch,
@@ -127,11 +137,12 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         tokens = self.encoding.encode(text)
 
         # we're ok; return a reference to the original string
-        if len(tokens) <= 8191:
+        if len(tokens) <= self.max_tokens:
             return text
 
         # truncate and re-encode to string.
-        truncated = tokens[:8191]
+        logger.debug("Truncating %d tokens to %d.", len(tokens), self.max_tokens)
+        truncated = tokens[: self.max_tokens]
         return self.encoding.decode(truncated)
 
 
@@ -175,12 +186,26 @@ def get_automatic_similarity_strategy() -> SimilarityStrategy:
     Instantiate the `OpenAIEmbeddingSimilarityStrategy`, if possible, or
     default to `PairwiseSimilarityStrategy` with the Damerau-levenshtein.
     """
+    global cached_strategy
+
+    if cached_strategy:
+        logger.debug("Using cached SimilarityStrategy.")
+        return cached_strategy
+
     try:
         import openai
 
         # will usually succeed if OPENAI_API_KEY is defined
         client = openai.OpenAI()
-        return OpenAIEmbeddingSimilarityStrategy(client)
+        strategy = OpenAIEmbeddingSimilarityStrategy(client)
+        cached_strategy = strategy
+        logger.debug("Instantiated and cached OpenAIEmbeddingSimilarityStrategy.")
+
+        return strategy
     except Exception:
-        pass
+        logger.warning(
+            "OpenAI unavailable; falling back to PairwiseSimilarityStrategy.",
+        )
+        logging.debug("Failed to instantiate OpenAI client.", exc_info=True)
+
     return PairwiseSimilarityStrategy()
