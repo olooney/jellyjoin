@@ -1,29 +1,30 @@
+- [ ] README custom similarity strategy
+- [ ] README Algorithm  and Diagrams
+- [ ] enforce / validate types
+- [ ] suffix options, similar to pd.merge()
+- [ ] column name options
+- [ ] CLI tool
 
-
-- [X] loggings and warnings
-- [X] cache openai client in automatic mode
 - [ ] Other Embedding Models
     - [ ] Local HuggingFace models?
     - [ ] Ollama embedding models
-- [X] README better examples
-- [ ] README custom similarity strategy
-- [ ] Refactor to Jelly class?
 - [ ] join option for blocking?
+- [ ] unit tests for plots?
+- [ ] Dedupe / clustering?
+- [ ] biclustering approach?
+- [ ] allow custom Mahalanobis distances with PSD matrix?
+- [ ] support polars?
+
+- [X] static type annotations
+- [X] README better examples
 - [X] embed: to truncate long content
 - [X] batch embed calls if too many
 - [X] test batching
 - [X] retry with exponential backoff?
 - [X] refactor to separate files?
 - [X] unit tests edge cases (empty lists, etc.)
-- [ ] unit tests for plots?
-- [X] static type annotations
-- [ ] enforce / validate types
-- [ ] support polars?
-- [ ] CLI tool
-- [ ] Dedupe / clustering?
-- [ ] biclustering approach?
-- [ ] allow custom Mahalanobis distances with PSD matrix?
 - [x] PyPI badges
-- [X] Black
-- [ ] suffix options, similar to pd.merge()
+- [X] Black (now Ruff)
 - [X] github test badge
+- [X] loggings and warnings
+- [X] cache openai client in automatic mode

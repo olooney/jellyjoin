@@ -109,7 +109,7 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
             batch = [self._truncate(text) for text in raw_batch]
 
             # embedding API call
-            logger.debug("Calling OpenAI embeddings API with %d strings.", len(batch))
+            logger.warning("Calling OpenAI embeddings API with %d strings.", len(batch))
             response = self.client.embeddings.create(
                 model=self.embedding_model,
                 input=batch,
