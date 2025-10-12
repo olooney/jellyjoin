@@ -35,7 +35,11 @@ pip install jellyjoin
 
 ## Basic Usage
 
-The most basic way to use `jellyjoin` is to simply pass it two lists:
+First, set up the `OPENAI_API_KEY` environment variable if you want to use the OpenAI embedding models (recommended.)
+You can also configure a custom `SimilarityStrategy` if you want to use another embedding model or other string
+comparison metric.
+
+Then the most basic way to use `jellyjoin` is to simply pass it two lists:
 
 ```python
 import jellyjoin
