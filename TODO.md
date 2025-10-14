@@ -1,3 +1,4 @@
+- [ ] Return a Result class with association df and similarity matrix
 - [ ] README custom similarity strategy
 - [ ] README Algorithm  and Diagrams
 - [ ] enforce / validate types
@@ -6,7 +7,7 @@
 - [ ] CLI tool
 
 - [ ] Other Embedding Models
-    - [ ] Local HuggingFace models?
+    - [X] implemented local nomic
     - [ ] Ollama embedding models
 - [ ] join option for blocking?
 - [ ] unit tests for plots?

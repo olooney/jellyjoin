@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
-from .strategy import get_automatic_similarity_strategy
-from .type_definitions import SimilarityStrategyCallable
+from .strategy import get_automatic_strategy
+from .typing import StrategyCallable
 
 __all__ = [
     "jellyjoin",
@@ -113,7 +113,7 @@ def jellyjoin(
     right: Union[pd.DataFrame, Collection],
     left_on: Optional[str] = None,
     right_on: Optional[str] = None,
-    similarity_strategy: Optional[SimilarityStrategyCallable] = None,
+    strategy: Optional[StrategyCallable] = None,
     threshold: float = 0.0,
     allow_many: AllowManyLiteral = "neither",
     how: HowLiteral = "inner",
@@ -132,8 +132,8 @@ def jellyjoin(
     Returns:
         DataFrame with joined data sorted by (Left, Right) indices
     """
-    if similarity_strategy is None:
-        similarity_strategy = get_automatic_similarity_strategy()
+    if strategy is None:
+        strategy = get_automatic_strategy()
 
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
@@ -148,7 +148,7 @@ def jellyjoin(
         right_on = right.columns[0]
 
     # Calculate similarity matrix
-    similarity_matrix = similarity_strategy(left[left_on], right[right_on])
+    similarity_matrix = strategy(left[left_on], right[right_on])
 
     # Find optimal assignments using Hungarian algorithm
     logger.debug("Solving assignment problem for %s matrix.", similarity_matrix.shape)

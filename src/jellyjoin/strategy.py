@@ -1,24 +1,26 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from typing import List
+from typing import List, Literal, Optional
 
 import numpy as np
 import tiktoken
-from numpy.typing import DTypeLike
+from numpy.typing import ArrayLike, DTypeLike
 
 from .similarity import get_similarity_function
-from .type_definitions import (
+from .typing import (
     PreprocessorCallable,
     SimilarityCallable,
     SimilarityIdentifier,
 )
 
 __all__ = [
-    "SimilarityStrategy",
-    "OpenAIEmbeddingSimilarityStrategy",
-    "PairwiseSimilarityStrategy",
-    "get_automatic_similarity_strategy",
+    "Strategy",
+    "EmbeddingStrategy",
+    "OpenAIEmbeddingStrategy",
+    "NomicEmbeddingStrategy",
+    "PairwiseStrategy",
+    "get_automatic_strategy",
 ]
 
 
@@ -35,7 +37,7 @@ def identity(x: str) -> str:
     return x
 
 
-class SimilarityStrategy(ABC):
+class Strategy(ABC):
     @abstractmethod
     def __call__(
         self,
@@ -43,35 +45,36 @@ class SimilarityStrategy(ABC):
         right_texts: Collection[str],
     ) -> np.ndarray:
         """
-        Computes the NxM similarity matrix between N left_texts and M right_texts.
+        Strategy used to compute the NxM similarity matrix between N left_texts and M right_texts.
         """
         pass
 
 
-class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
+class EmbeddingStrategy(Strategy):
+    """
+    Base class for Strategies that use an embedding model to calculate
+    similarities. Implement the abstract `call_embedding_api()` method
+    to provide a concrete implmenetation.
+
+    The EmbeddingStrategy will ensure that `call_embedding_api()` is
+    never called with at least one but not more than `batch_size`
+    strings, and that each of the these strings will have fewer than
+    `max_tokens` tokens according to the tiktoken `encoding`.
+    """
+
     def __init__(
         self,
-        client,
         preprocessor: PreprocessorCallable = identity,
-        embedding_model: str = "text-embedding-3-large",
-        batch_size: int = 2048,
-        max_tokens: int = 8191,
-        encoding: str = "cl100k_base",
-        dtype: DTypeLike = np.float32,
     ):
         """
-        Uses an OpenAI embedding model (text-embedding-3-large by default) to
-        calculate the embeddings, then uses a matrix product to quickly
-        calculate all cosine similarities. OpenAI embeddings are already
-        normalized, so this inner product is the same as the cosine similarity.
+        Initialize an EmbeddingStrategy.
+
+        Parameters
+        ----------
+        preprocessor : PreprocessorCallable, optional
+            A callable applied to each text before embedding. Defaults to `identity`.
         """
-        self.client = client
         self.preprocessor = preprocessor
-        self.embedding_model = embedding_model
-        self.batch_size = int(batch_size)
-        self.max_tokens = int(max_tokens)
-        self.encoding = tiktoken.get_encoding(encoding)
-        self.dtype = dtype
 
     def __call__(
         self,
@@ -98,29 +101,54 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
 
         return similarity_matrix
 
-    def embed(self, texts: List[str]) -> np.ndarray:
+
+class OpenAIEmbeddingStrategy(EmbeddingStrategy):
+    """
+    Uses an OpenAI embedding model (text-embedding-3-large by default) to
+    calculate the embedding vectors used for the embedding vector matrix
+    multiplication similarity strategy.
+    """
+
+    def __init__(
+        self,
+        client=None,
+        embedding_model: str = "text-embedding-3-large",
+        preprocessor: PreprocessorCallable = identity,
+        batch_size: int = 2048,
+        max_tokens: int = 6000,
+        encoding: str = "cl100k_base",
+        dtype: DTypeLike = np.float32,
+    ):
         """
-        Get embeddings from the OpenAI client in batches of size `self.batch_size`.
+        client:
+            An OpenAI API client instance used to perform embedding requests.
+        preprocessor:
+            A callable applied to each text before embedding. Defaults to `identity`.
+        embedding_model:
+            Name of the OpenAI embedding model to use. Defaults to `"text-embedding-3-large"`.
+        batch_size:
+            Maximum number of strings to send in one API call. Defaults to 2048.
+        max_tokens:
+            Maximum number of tokens allowed per string according to the encoding. Defaults to 8191.
+        encoding:
+            Name of the tiktoken encoding to use for token counting. Defaults to `"cl100k_base"`.
+        dtype:
+            Data type of the returned embedding arrays. Defaults to `np.float32`.
         """
-        all_vectors = []
+        if client is None:
+            import openai
 
-        for i in range(0, len(texts), self.batch_size):
-            raw_batch = texts[i : i + self.batch_size]
-            batch = [self._truncate(text) for text in raw_batch]
+            self.client = openai.OpenAI()
+        else:
+            self.client = client
 
-            # embedding API call
-            logger.warning("Calling OpenAI embeddings API with %d strings.", len(batch))
-            response = self.client.embeddings.create(
-                model=self.embedding_model,
-                input=batch,
-                encoding_format="float",
-            )
+        self.embedding_model = embedding_model
+        self.batch_size = int(batch_size)
+        self.max_tokens = int(max_tokens)
+        self.encoding = tiktoken.get_encoding(encoding)
+        self.dtype = dtype
 
-            # stack up vectors
-            vectors = [e.embedding for e in response.data]
-            all_vectors.extend(vectors)
-
-        return np.array(all_vectors, dtype=self.dtype)
+        super().__init__(preprocessor=preprocessor)
 
     def _truncate(
         self,
@@ -145,16 +173,123 @@ class OpenAIEmbeddingSimilarityStrategy(SimilarityStrategy):
         truncated = tokens[: self.max_tokens]
         return self.encoding.decode(truncated)
 
+    def _call_embedding_api(self, batch: List[str]) -> List[ArrayLike]:
+        logger.debug("Calling OpenAI embeddings API with %d strings.", len(batch))
 
-class PairwiseSimilarityStrategy(SimilarityStrategy):
+        response = self.client.embeddings.create(
+            model=self.embedding_model,
+            input=batch,
+            encoding_format="float",
+        )
+
+        return [e.embedding for e in response.data]
+
+    def embed(self, texts: Collection[str]) -> np.ndarray:
+        """
+        Get embeddings from the OpenAI client in batches of size `self.batch_size`.
+        Returns a matrix of shape `(len(texts), D)`, where `D` is the number of
+        dimensions of the embedding vectors.
+        """
+        all_vectors = []
+
+        for i in range(0, len(texts), self.batch_size):
+            raw_batch = texts[i : i + self.batch_size]
+            batch = [self._truncate(text) for text in raw_batch]
+
+            vectors = self._call_embedding_api(batch)
+            all_vectors.extend(vectors)
+
+        return np.array(all_vectors, dtype=self.dtype)
+
+
+class NomicEmbeddingStrategy(EmbeddingStrategy):
+    """
+    Uses a Nomic embedding model locally (via GPT4All backend) to compute embeddings.
+    """
+
+    TaskTypeLiteral = Literal[
+        "search_document", "search_query", "classification", "clustering"
+    ]
+
+    def __init__(
+        self,
+        embedding_model: str = "nomic-embed-text-v1.5",
+        preprocessor: PreprocessorCallable = identity,
+        task_type: TaskTypeLiteral = "search_document",
+        dimensionality: Optional[int] = None,
+        device: Optional[Literal["cpu", "gpu"]] = None,
+        allow_download: bool = True,
+        dtype: DTypeLike = np.float32,
+    ):
+        """
+        Local Nomic embeddings (no network calls after first model download).
+
+        Parameters
+        ----------
+        embedding_model:
+            Nomic model name, e.g. "nomic-embed-text-v1.5".
+        preprocessor:
+            A callable applied to each text before embedding. Defaults to `identity`.
+        task_type:
+            One of {"search_document","search_query","classification","clustering"}.
+        dimensionality : int | None
+            Output embedding size (v1.5 supports 64..768). None = model default.
+        device:
+            Device for local mode (e.g., 'gpu'). `None` for automatic.
+        allow_download:
+            True if nomic should download and cache the model automatically if
+            it's not available locally.
+        dtype:
+            Data type of the returned embedding arrays. Defaults to `np.float32`.
+        """
+        # deferred import of nomic.
+        import nomic.embed as nomic_embed
+
+        self.nomic_embed = nomic_embed
+
+        self.embedding_model = embedding_model
+        self.task_type = task_type
+        self.dimensionality = dimensionality
+        self.device = device
+        self.allow_download = bool(allow_download)
+        self.dtype = dtype
+
+        super().__init__(preprocessor=preprocessor)
+
+    def embed(self, texts: Collection[str]) -> np.ndarray:
+        result = self.nomic_embed.text(
+            texts=texts,
+            model=self.embedding_model,
+            task_type=self.task_type,
+            inference_mode="local",
+            long_text_mode="truncate",
+            device=self.device,
+            dimensionality=self.dimensionality,
+            allow_download=self.allow_download,
+        )
+
+        return np.array(result["embeddings"], dtype=self.dtype)
+
+
+class PairwiseStrategy(Strategy):
+    """
+    A simpler, non-vectorized similarity strategy which calls a
+    similarity function for every possible pair of strings from the left
+    and right sides.
+    """
+
     def __init__(
         self,
         similarity_function: SimilarityIdentifier = None,
         preprocessor: PreprocessorCallable = identity,
     ):
         """
-        preprocessor: A callable that preprocesses each input string (e.g., soundex or metaphone).
-        similarity_func: A callable that computes similarity between two strings (e.g., jellyfish.jaro_winkler).
+        similarity_func:
+            A callable that computes similarity between two strings (e.g., jellyfish.jaro_winkler),
+            or a string identifier for one of the standard similarity functions. Defaults to
+            `jellyjoin.similarity.damerau_levenshtein_similarity`.
+        preprocessor:
+            A callable that preprocesses each input string (e.g., soundex or lowercase.).
         """
         self.preprocessor = preprocessor
         self.similarity_function: SimilarityCallable = get_similarity_function(
@@ -181,31 +316,25 @@ class PairwiseSimilarityStrategy(SimilarityStrategy):
         return similarity_matrix
 
 
-def get_automatic_similarity_strategy() -> SimilarityStrategy:
+def get_automatic_strategy() -> Strategy:
     """
-    Instantiate the `OpenAIEmbeddingSimilarityStrategy`, if possible, or
-    default to `PairwiseSimilarityStrategy` with the Damerau-levenshtein.
+    Tries to instantiate an similarity Strategy in this order:
+        1. `OpenAIEmbeddingStrategy`
+        2.`PairwiseStrategy`
     """
     global cached_strategy
 
     if cached_strategy:
-        logger.debug("Using cached SimilarityStrategy.")
+        logger.debug("Using cached jellyjoin.Strategy.")
         return cached_strategy
 
     try:
-        import openai
-
-        # will usually succeed if OPENAI_API_KEY is defined
-        client = openai.OpenAI()
-        strategy = OpenAIEmbeddingSimilarityStrategy(client)
+        strategy = OpenAIEmbeddingStrategy()
         cached_strategy = strategy
-        logger.debug("Instantiated and cached OpenAIEmbeddingSimilarityStrategy.")
-
+        logger.debug("Instantiated and cached OpenAIEmbeddingStrategy.")
         return strategy
     except Exception:
-        logger.warning(
-            "OpenAI unavailable; falling back to PairwiseSimilarityStrategy.",
-        )
+        logger.warning("OpenAI unavailable; trying next strategy...")
         logging.debug("Failed to instantiate OpenAI client.", exc_info=True)
 
-    return PairwiseSimilarityStrategy()
+    return PairwiseStrategy()

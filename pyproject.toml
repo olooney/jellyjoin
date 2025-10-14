@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.2.3"
+version = "0.2.4"
 description = "Utilities for dataset similarity and joins"
 authors = [
     { name = "Oran Looney", email = "olooney@gmail.com" }
@@ -36,7 +36,8 @@ dependencies = [
 dev = [
     "build",
     "matplotlib>=3.8.4",
-    "openai",
+    "openai>=1.61.1",
+    "nomic>=3.6.0",
     "pre-commit",
     "pytest",
     "python-dotenv",

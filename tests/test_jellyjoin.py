@@ -98,12 +98,12 @@ def right_df():
 
 @pytest.fixture
 def pairwise_strategy_default():
-    return jellyjoin.PairwiseSimilarityStrategy()
+    return jellyjoin.PairwiseStrategy()
 
 
 @pytest.fixture
 def pairwise_strategy_jw_lower():
-    return jellyjoin.PairwiseSimilarityStrategy(
+    return jellyjoin.PairwiseStrategy(
         "jaro-winkler",
         preprocessor=lambda x: x.lower(),
     )
@@ -111,7 +111,7 @@ def pairwise_strategy_jw_lower():
 
 @pytest.fixture
 def pairwise_strategy_levenshtein():
-    return jellyjoin.PairwiseSimilarityStrategy(levenshtein_similarity)
+    return jellyjoin.PairwiseStrategy(levenshtein_similarity)
 
 
 @pytest.fixture(scope="session")
@@ -124,7 +124,7 @@ def openai_client():
 
 @pytest.fixture
 def openai_strategy(openai_client):
-    return jellyjoin.OpenAIEmbeddingSimilarityStrategy(openai_client)
+    return jellyjoin.OpenAIEmbeddingStrategy(openai_client)
 
 
 # -----------------------
@@ -137,9 +137,7 @@ def test_version():
     assert jellyjoin.__version__ > "0.0.0"
 
 
-def test_pairwise_similarity_strategy_defaults(
-    pairwise_strategy_default, left_words, right_words
-):
+def test_pairwise_strategy_defaults(pairwise_strategy_default, left_words, right_words):
     matrix = pairwise_strategy_default(left_words, right_words)
     expected = np.array(
         [
@@ -151,9 +149,7 @@ def test_pairwise_similarity_strategy_defaults(
     assert np.allclose(matrix, expected)
 
 
-def test_pairwise_similarity_strategy(
-    pairwise_strategy_jw_lower, left_words, right_words
-):
+def test_pairwise_strategy(pairwise_strategy_jw_lower, left_words, right_words):
     matrix = pairwise_strategy_jw_lower(left_words, right_words)
     expected = np.array(
         [
@@ -181,6 +177,30 @@ def test_pairwise_strategy_square(pairwise_strategy_default, left_sections):
     assert np.all(matrix >= 0.0) and np.all(matrix <= 1.0)
     assert np.all(np.isclose(matrix, matrix.T))
     assert np.all(np.isclose(np.diag(matrix), 1.0))
+
+
+def test_nomic_strategy_defaults(left_words, right_words):
+    pytest.importorskip("nomic", reason="nomic package not installed")
+    nomic_strategy = jellyjoin.NomicEmbeddingStrategy()
+    matrix = nomic_strategy(left_words, right_words)
+    assert matrix.shape == (len(left_words), len(right_words))
+
+
+def test_nomic_strategy_config(left_words, right_words):
+    pytest.importorskip("nomic", reason="nomic package not installed")
+
+    nomic_strategy = jellyjoin.NomicEmbeddingStrategy(
+        embedding_model="nomic-embed-text-v1.5",
+        preprocessor=lambda x: x.lower(),
+        task_type="search_query",
+        dimensionality=100,
+        device="gpu",
+        allow_download=True,
+        dtype=np.float64,
+    )
+    matrix = nomic_strategy(left_words, right_words)
+    assert matrix.shape == (len(left_words), len(right_words))
+    assert matrix.dtype == np.float64
 
 
 @pytest.mark.parametrize(
@@ -259,7 +279,7 @@ def test_openai_strategy_batch(openai_strategy):
 @pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
 def test_openai_strategy_small_batch(openai_client):
     LENGTH = 5
-    strategy = jellyjoin.OpenAIEmbeddingSimilarityStrategy(
+    strategy = jellyjoin.OpenAIEmbeddingStrategy(
         openai_client,
         batch_size=2,
     )
@@ -286,6 +306,7 @@ def test_openai_strategy_truncate(openai_strategy):
 
 @pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
 def test_openai_strategy_caching():
-    strategy1 = jellyjoin.get_automatic_similarity_strategy()
-    strategy2 = jellyjoin.get_automatic_similarity_strategy()
+    pytest.importorskip("openai")
+    strategy1 = jellyjoin.get_automatic_strategy()
+    strategy2 = jellyjoin.get_automatic_strategy()
     assert strategy1 is strategy2

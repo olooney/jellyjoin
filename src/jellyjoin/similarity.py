@@ -2,7 +2,7 @@ from typing import Union
 
 import jellyfish
 
-from .type_definitions import SimilarityCallable
+from .typing import SimilarityCallable
 
 __all__ = [
     "hamming_similarity",
