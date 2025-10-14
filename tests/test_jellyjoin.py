@@ -4,6 +4,7 @@ import re
 import dotenv
 import numpy as np
 import pandas as pd
+import pandas.testing as pdt
 import pytest
 
 import jellyjoin
@@ -203,6 +204,37 @@ def test_nomic_strategy_config(left_words, right_words):
     assert matrix.dtype == np.float64
 
 
+def test_triple_join():
+    from jellyjoin.join import triple_join
+
+    left = pd.DataFrame(
+        {"x": [1, 2, 3], "name": ["aa", "bb", "cc"], "Left": [True] * 3}
+    )
+    middle = pd.DataFrame(
+        {"Left": [0, 1, 2], "Right": [2, 0, 1], "Similarity": [0.5, 0.6, 0.7]}
+    )
+    right = pd.DataFrame(
+        {"y": [1, 2, 3], "name": ["AA", "BB", "CC"], "Right": [False] * 3}
+    )
+
+    result = triple_join(left, middle, right, how="inner", suffixes=("_left", "_right"))
+
+    expected_columns = [
+        "Left",
+        "Right",
+        "Similarity",
+        "x",
+        "name_left",
+        "Left_left",
+        "y",
+        "name_right",
+        "Right_right",
+    ]
+    assert list(result.columns) == expected_columns
+    assert result["name_left"].tolist() == ["aa", "bb", "cc"]
+    assert result["name_right"].tolist() == ["CC", "AA", "BB"]
+
+
 @pytest.mark.parametrize(
     "left,right",
     [
@@ -221,6 +253,61 @@ def test_jellyjoin_empty(left, right):
         "Right Value",
     ]
     assert len(df) == 0
+
+
+def test_jellyjoin_options():
+    left = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["aaa", "bbb", "ccc"],
+            "left": [True] * 3,
+        }
+    )
+    right = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["aab", "bb", "cac"],
+            "right": [False] * 3,
+        }
+    )
+
+    df = jellyjoin.jellyjoin(
+        left,
+        right,
+        on="name",
+        strategy=jellyjoin.PairwiseStrategy("jaro-winkler"),
+        threshold=0.01,
+        allow_many="left",
+        how="outer",
+        association_column_names=("left_index", "right_index", "score"),
+        suffixes=("_2024", "_2025"),
+    )
+
+    expected = pd.DataFrame(
+        {
+            "left_index": [0, 1, 2],
+            "right_index": [0, 1, 2],
+            "score": [0.822222, 0.911111, 0.8],
+            "id_2024": [1, 2, 3],
+            "name_2024": ["aaa", "bbb", "ccc"],
+            "left": [True, True, True],
+            "id_2025": [1, 2, 3],
+            "name_2025": ["aab", "bb", "cac"],
+            "right": [False, False, False],
+        }
+    )
+
+    # Ensure column order is exactly as expected
+    assert list(df.columns) == list(expected.columns)
+
+    # Compare values with float tolerance and matching index
+    pdt.assert_frame_equal(
+        df.reset_index(drop=True),
+        expected,
+        check_dtype=True,
+        atol=1e-6,
+        rtol=1e-6,
+    )
 
 
 def test_jellyjoin_with_lists(left_sections, right_sections):
@@ -267,7 +354,7 @@ def test_openai_strategy(openai_strategy, left_sections, right_sections):
 
 
 # too expensive to run all the time...
-@pytest.mark.skipif(True, reason="no API key")
+@pytest.mark.skipif(True, reason="Too expensive")
 def test_openai_strategy_batch(openai_strategy):
     LENGTH = 5000
     left = ["test"] * LENGTH

@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Collection
-from typing import Iterable, List, Literal, Optional, Tuple, Union
+from typing import Iterable, List, Literal, Optional, Tuple, Union, get_args
 
 import numpy as np
 import pandas as pd
@@ -85,6 +85,7 @@ def triple_join(
     middle: pd.DataFrame,
     right: pd.DataFrame,
     how: HowLiteral,
+    suffixes: Iterable,
 ) -> pd.DataFrame:
     """
     Joins three dataframes together, with the associations in the middle.
@@ -92,18 +93,24 @@ def triple_join(
     left_how = "outer" if how in ["left", "outer"] else "left"
     right_how = "outer" if how in ["right", "outer"] else "left"
 
+    # ensure unique enough column names
+    left_dupes = set(left.columns) & (set(middle.columns) | set(right.columns))
+    right_dupes = (set(left.columns) | set(middle.columns)) & set(right.columns)
+    duplicate_columns = left_dupes | right_dupes
+    left = left.rename(columns={c: c + suffixes[0] for c in duplicate_columns})
+    right = right.rename(columns={c: c + suffixes[1] for c in duplicate_columns})
+
     # Join with original dataframes
-    intermediate_df = middle.merge(
+    left_middle = middle.merge(
         left.reset_index(drop=True),
-        left_on="Left",
+        left_on=middle.columns[0],
         right_index=True,
         how=left_how,
     )
-    return intermediate_df.merge(
+    return left_middle.merge(
         right.reset_index(drop=True),
-        left_on="Right",
+        left_on=middle.columns[1],
         right_index=True,
-        suffixes=("_left", "_right"),
         how=right_how,
     )
 
@@ -111,12 +118,15 @@ def triple_join(
 def jellyjoin(
     left: Union[pd.DataFrame, Collection],
     right: Union[pd.DataFrame, Collection],
+    on: Optional[str] = None,
     left_on: Optional[str] = None,
     right_on: Optional[str] = None,
     strategy: Optional[StrategyCallable] = None,
     threshold: float = 0.0,
     allow_many: AllowManyLiteral = "neither",
     how: HowLiteral = "inner",
+    association_column_names: Collection = ("Left", "Right", "Similarity"),
+    suffixes: Collection = ("_left", "_right"),
 ) -> pd.DataFrame:
     """
     Join dataframes or lists based on semantic similarity.
@@ -124,54 +134,83 @@ def jellyjoin(
     Args:
         left: Left DataFrame or Collection of strings
         right: Right DataFrame or Collection of strings
+        on: Join column name to use for both left and right dataframes
         left_on: Column name to use for left dataframe
         right_on: Column name to use for right dataframe
+        strategy: `jelljoin.Strategy` to use to calculate similarity
         threshold: Minimum similarity score to consider a match (default: 0.0)
         allow_many: Find one-to-many assocations
+        association_column_names:
+            names for the three columns jellyjoins adds to the dataframe.
+        suffixes:
+            column suffixes added on the left and right sides to ensure
+            uniqueness.
 
     Returns:
         DataFrame with joined data sorted by (Left, Right) indices
     """
+    # validate arguments
+    if len(suffixes) != 2:
+        raise ValueError("Pass exactly two suffixes.")
+
+    if len(association_column_names) != 3:
+        raise ValueError(
+            "Pass exactly three association_column_names: left index, right index, and similarity score."
+        )
+
+    if allow_many not in get_args(AllowManyLiteral):
+        raise ValueError('allow_many must be "left", "right", "both", or "neither".')
+
+    if how not in get_args(HowLiteral):
+        raise ValueError('how argument must be "inner", "left", "right", or "outer".')
+
     if strategy is None:
         strategy = get_automatic_strategy()
+
+    # handle the shared "on" column name
+    if on:
+        if left_on or right_on:
+            raise ValueError('Pass only "on" or "left_on" and "right_on", not both.')
+        left_on = on
+        right_on = on
 
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
         left = pd.DataFrame({left_on or "Left Value": list(left)})
+
     if not isinstance(right, pd.DataFrame):
         right = pd.DataFrame({right_on or "Right Value": list(right)})
 
-    # default to the first column if not explicitly named
+    # default to joining on the first column if not explicitly named
     if not left_on:
         left_on = left.columns[0]
+
     if not right_on:
         right_on = right.columns[0]
 
     # Calculate similarity matrix
     similarity_matrix = strategy(left[left_on], right[right_on])
 
-    # Find optimal assignments using Hungarian algorithm
+    # Find optimal one-to-one assignments using Hungarian algorithm
     logger.debug("Solving assignment problem for %s matrix.", similarity_matrix.shape)
     row_indices, col_indices = linear_sum_assignment(-similarity_matrix)
     scores = similarity_matrix[row_indices, col_indices]
-
-    # Filter by threshold
     mask = scores >= threshold
     assignments = list(zip(row_indices[mask], col_indices[mask], scores[mask]))
 
+    # Add on extra one-to-many or many-to-one assignments if desired
     if allow_many != "neither":
         extra_assignments = all_extra_assignments(
             allow_many, assignments, similarity_matrix, threshold
         )
         assignments.extend(extra_assignments)
 
-    # Create dataframe from assignments
-    assignment_df = pd.DataFrame(assignments, columns=["Left", "Right", "Similarity"])
-
-    # join all three data frames together
-    result = triple_join(left, assignment_df, right, how)
+    # join left to right with the assignments in the middle
+    middle = pd.DataFrame(assignments, columns=association_column_names)
+    result = triple_join(left, middle, right, how, suffixes)
 
     # Sort and reset index
-    result = result.sort_values(by=["Left", "Right"]).reset_index(drop=True)
+    result = result.sort_values(by=list(association_column_names))
+    result = result.reset_index(drop=True)
 
     return result

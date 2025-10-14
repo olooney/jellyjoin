@@ -1,9 +1,9 @@
-- [ ] Return a Result class with association df and similarity matrix
+- [X] Return similarity matrix along with dataframe
 - [ ] README custom similarity strategy
 - [ ] README Algorithm  and Diagrams
-- [ ] enforce / validate types
-- [ ] suffix options, similar to pd.merge()
-- [ ] column name options
+- [X] enforce / validate types
+- [X] suffix options, similar to pd.merge()
+- [X] column name options
 - [ ] CLI tool
 
 - [ ] Other Embedding Models
