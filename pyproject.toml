@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.2.4"
+version = "0.2.5"
 description = "Utilities for dataset similarity and joins"
 authors = [
     { name = "Oran Looney", email = "olooney@gmail.com" }
@@ -54,6 +54,7 @@ Homepage = "https://github.com/olooney/jellyjoin"
 Repository = "https://github.com/olooney/jellyjoin"
 
 [tool.ruff]
+target-version = "py310"
 fix = true
 src = ["src", "tests"]
 

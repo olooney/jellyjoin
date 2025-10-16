@@ -1,8 +1,6 @@
-from typing import Union
-
 import jellyfish
 
-from .typing import SimilarityCallable
+from .typing import SimilarityCallable, SimilarityLike
 
 __all__ = [
     "hamming_similarity",
@@ -10,6 +8,7 @@ __all__ = [
     "damerau_levenshtein_similarity",
     "jaro_similarity",
     "jaro_winkler_similarity",
+    "get_similarity_function",
 ]
 
 
@@ -154,7 +153,7 @@ FUNCTION_MAP = {
 
 
 def get_similarity_function(
-    function: Union[None, str, SimilarityCallable],
+    function: SimilarityLike,
 ) -> SimilarityCallable:
     """
     Resolve a string identifier to a string similarity function.

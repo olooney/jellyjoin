@@ -1,20 +1,32 @@
-- [X] Return similarity matrix along with dataframe
 - [ ] README custom similarity strategy
 - [ ] README Algorithm  and Diagrams
-- [X] enforce / validate types
-- [X] suffix options, similar to pd.merge()
-- [X] column name options
-- [ ] CLI tool
+- [ ] Review README against recent API changes
 
+- [X] Return similarity matrix along with dataframe?
 - [ ] Other Embedding Models
     - [X] implemented local nomic
     - [ ] Ollama embedding models
+
+Backlog
+-------
+
 - [ ] join option for blocking?
 - [ ] unit tests for plots?
 - [ ] Dedupe / clustering?
 - [ ] biclustering approach?
 - [ ] allow custom Mahalanobis distances with PSD matrix?
 - [ ] support polars?
+- [ ] CLI tool
+
+Done
+----
+
+- [X] support named strategies
+- [X] enforce / validate types
+- [X] suffix options, similar to pd.merge()
+- [X] column name options
+- [X] flag private methods
+- [X] Use | for Union types
 
 - [X] static type annotations
 - [X] README better examples

@@ -1,13 +1,17 @@
 import logging
 from collections.abc import Collection
-from typing import Iterable, List, Literal, Optional, Tuple, Union, get_args
+from typing import Iterable, List, Tuple, get_args
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
 
-from .strategy import get_automatic_strategy
-from .typing import StrategyCallable
+from .strategy import get_similarity_strategy
+from .typing import (
+    AllowManyLiteral,
+    HowLiteral,
+    StrategyLike,
+)
 
 __all__ = [
     "jellyjoin",
@@ -15,13 +19,11 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# types
-HowLiteral = Literal["inner", "left", "right", "outer"]
-AllowManyLiteral = Literal["neither", "left", "right", "both"]
+# internal type only used by private functions
 AssignmentList = List[Tuple[int, int, float]]
 
 
-def find_extra_assignments(
+def _find_extra_assignments(
     similarity_matrix: np.ndarray,
     unassigned: Iterable[int],
     threshold: float,
@@ -46,7 +48,7 @@ def find_extra_assignments(
     return extra_assignments
 
 
-def all_extra_assignments(
+def _all_extra_assignments(
     allow_many: AllowManyLiteral,
     assignments: AssignmentList,
     similarity_matrix: np.ndarray,
@@ -64,7 +66,7 @@ def all_extra_assignments(
     if allow_many in ["right", "both"]:
         logger.debug("Searching for extra right (one-to-many) assignments.")
         unassigned_right = list(set(range(n_right)) - set(a[1] for a in assignments))
-        extra_assignments = find_extra_assignments(
+        extra_assignments = _find_extra_assignments(
             similarity_matrix, unassigned_right, threshold, transpose=True
         )
         new_assignments.extend(extra_assignments)
@@ -73,14 +75,14 @@ def all_extra_assignments(
     if allow_many in ["left", "both"]:
         logger.debug("Searching for extra left (many-to-one) assignments.")
         unassigned_left = list(set(range(n_left)) - set(a[0] for a in assignments))
-        extra_assignments = find_extra_assignments(
+        extra_assignments = _find_extra_assignments(
             similarity_matrix, unassigned_left, threshold, transpose=False
         )
         new_assignments.extend(extra_assignments)
     return new_assignments
 
 
-def triple_join(
+def _triple_join(
     left: pd.DataFrame,
     middle: pd.DataFrame,
     right: pd.DataFrame,
@@ -115,19 +117,77 @@ def triple_join(
     )
 
 
+def _coerce_to_dataframes(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    on: str | None,
+    left_on: str | None,
+    right_on: str | None,
+) -> Tuple[pd.DataFrame, pd.DataFrame, str, str]:
+    # handle the shared "on" column name
+    if on:
+        if left_on or right_on:
+            raise ValueError('Pass only "on" or "left_on" and "right_on", not both.')
+        left_on = on
+        right_on = on
+
+    # Convert inputs to dataframes if they aren't already
+    if not isinstance(left, pd.DataFrame):
+        left = pd.DataFrame({left_on or "Left Value": list(left)})
+
+    if not isinstance(right, pd.DataFrame):
+        right = pd.DataFrame({right_on or "Right Value": list(right)})
+
+    # TODO: magic case where the two dataframes share exactly one column name?
+
+    # default to joining on the first column if not explicitly named
+    if not left_on:
+        left_on = left.columns[0]
+
+    if not right_on:
+        right_on = right.columns[0]
+
+    return left, right, left_on, right_on
+
+
+def _validate_jellyjoin_arguments(
+    suffixes: Collection,
+    association_column_names: Collection,
+    allow_many: AllowManyLiteral,
+    how: HowLiteral,
+):
+    """
+    Raises exception for any invalid arguments.
+    """
+    if len(suffixes) != 2:
+        raise ValueError("Pass exactly two suffixes.")
+
+    if len(association_column_names) != 3:
+        raise ValueError(
+            "Pass exactly three association_column_names: left index, right index, and similarity score."
+        )
+
+    if allow_many not in get_args(AllowManyLiteral):
+        raise ValueError('allow_many must be "left", "right", "both", or "neither".')
+
+    if how not in get_args(HowLiteral):
+        raise ValueError('how argument must be "inner", "left", "right", or "outer".')
+
+
 def jellyjoin(
-    left: Union[pd.DataFrame, Collection],
-    right: Union[pd.DataFrame, Collection],
-    on: Optional[str] = None,
-    left_on: Optional[str] = None,
-    right_on: Optional[str] = None,
-    strategy: Optional[StrategyCallable] = None,
+    left: pd.DataFrame | Collection,
+    right: pd.DataFrame | Collection,
+    on: str | None = None,
+    left_on: str | None = None,
+    right_on: str | None = None,
+    strategy: StrategyLike = None,
     threshold: float = 0.0,
     allow_many: AllowManyLiteral = "neither",
     how: HowLiteral = "inner",
     association_column_names: Collection = ("Left", "Right", "Similarity"),
     suffixes: Collection = ("_left", "_right"),
-) -> pd.DataFrame:
+    return_similarity_matrix: bool = False,
+) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
     """
     Join dataframes or lists based on semantic similarity.
 
@@ -145,48 +205,22 @@ def jellyjoin(
         suffixes:
             column suffixes added on the left and right sides to ensure
             uniqueness.
+        return_similarity_matrix:
+            pass True to return the pair (dataframe, similarity_matrix)
+            instead of just the dataframe (default)
 
     Returns:
         DataFrame with joined data sorted by (Left, Right) indices
     """
-    # validate arguments
-    if len(suffixes) != 2:
-        raise ValueError("Pass exactly two suffixes.")
+    _validate_jellyjoin_arguments(suffixes, association_column_names, allow_many, how)
 
-    if len(association_column_names) != 3:
-        raise ValueError(
-            "Pass exactly three association_column_names: left index, right index, and similarity score."
-        )
+    # resolve StrategyLike to specific Strategy instance
+    strategy = get_similarity_strategy(strategy)
 
-    if allow_many not in get_args(AllowManyLiteral):
-        raise ValueError('allow_many must be "left", "right", "both", or "neither".')
-
-    if how not in get_args(HowLiteral):
-        raise ValueError('how argument must be "inner", "left", "right", or "outer".')
-
-    if strategy is None:
-        strategy = get_automatic_strategy()
-
-    # handle the shared "on" column name
-    if on:
-        if left_on or right_on:
-            raise ValueError('Pass only "on" or "left_on" and "right_on", not both.')
-        left_on = on
-        right_on = on
-
-    # Convert inputs to dataframes if they aren't already
-    if not isinstance(left, pd.DataFrame):
-        left = pd.DataFrame({left_on or "Left Value": list(left)})
-
-    if not isinstance(right, pd.DataFrame):
-        right = pd.DataFrame({right_on or "Right Value": list(right)})
-
-    # default to joining on the first column if not explicitly named
-    if not left_on:
-        left_on = left.columns[0]
-
-    if not right_on:
-        right_on = right.columns[0]
+    # standardize to dataframes joined on specific columns
+    left, right, left_on, right_on = _coerce_to_dataframes(
+        left, right, on, left_on, right_on
+    )
 
     # Calculate similarity matrix
     similarity_matrix = strategy(left[left_on], right[right_on])
@@ -200,17 +234,20 @@ def jellyjoin(
 
     # Add on extra one-to-many or many-to-one assignments if desired
     if allow_many != "neither":
-        extra_assignments = all_extra_assignments(
+        extra_assignments = _all_extra_assignments(
             allow_many, assignments, similarity_matrix, threshold
         )
         assignments.extend(extra_assignments)
 
     # join left to right with the assignments in the middle
     middle = pd.DataFrame(assignments, columns=association_column_names)
-    result = triple_join(left, middle, right, how, suffixes)
+    result = _triple_join(left, middle, right, how, suffixes)
 
     # Sort and reset index
     result = result.sort_values(by=list(association_column_names))
     result = result.reset_index(drop=True)
 
-    return result
+    if return_similarity_matrix:
+        return result, similarity_matrix
+    else:
+        return result

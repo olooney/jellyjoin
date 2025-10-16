@@ -1,7 +1,6 @@
 import logging
-from abc import ABC, abstractmethod
 from collections.abc import Collection
-from typing import List, Literal, Optional
+from typing import List, Literal
 
 import numpy as np
 import tiktoken
@@ -11,7 +10,10 @@ from .similarity import get_similarity_function
 from .typing import (
     PreprocessorCallable,
     SimilarityCallable,
-    SimilarityIdentifier,
+    SimilarityLike,
+    Strategy,
+    StrategyCallable,
+    StrategyLike,
 )
 
 __all__ = [
@@ -20,6 +22,7 @@ __all__ = [
     "OpenAIEmbeddingStrategy",
     "NomicEmbeddingStrategy",
     "PairwiseStrategy",
+    "get_similarity_strategy",
     "get_automatic_strategy",
 ]
 
@@ -29,25 +32,12 @@ logger = logging.getLogger(__name__)
 
 # global used to cache the automatic strategy to prevent instantiating a new
 # OpenAI client for every call.
-cached_strategy = None
+_cached_strategy = None
 
 
 # identity function used as a default argument to several functions
 def identity(x: str) -> str:
     return x
-
-
-class Strategy(ABC):
-    @abstractmethod
-    def __call__(
-        self,
-        left_texts: Collection[str],
-        right_texts: Collection[str],
-    ) -> np.ndarray:
-        """
-        Strategy used to compute the NxM similarity matrix between N left_texts and M right_texts.
-        """
-        pass
 
 
 class EmbeddingStrategy(Strategy):
@@ -216,8 +206,8 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         embedding_model: str = "nomic-embed-text-v1.5",
         preprocessor: PreprocessorCallable = identity,
         task_type: TaskTypeLiteral = "search_document",
-        dimensionality: Optional[int] = None,
-        device: Optional[Literal["cpu", "gpu"]] = None,
+        dimensionality: int | None = None,
+        device: Literal["cpu", "gpu"] | None = None,
         allow_download: bool = True,
         dtype: DTypeLike = np.float32,
     ):
@@ -280,7 +270,7 @@ class PairwiseStrategy(Strategy):
 
     def __init__(
         self,
-        similarity_function: SimilarityIdentifier = None,
+        similarity_function: SimilarityLike = None,
         preprocessor: PreprocessorCallable = identity,
     ):
         """
@@ -316,21 +306,67 @@ class PairwiseStrategy(Strategy):
         return similarity_matrix
 
 
+def get_similarity_strategy(
+    strategy: StrategyLike | None = None,
+) -> Strategy | StrategyCallable:
+    """
+    Resolves a strategy identifier to a strategy class.
+
+    - "openai" or "nomic" will instantiate those strategies with default arguments.
+    - any other string will be passed to `PairwiseStrategy` which will
+      interpret it as the name of a similarity function, e.g. 'jaro-winkler'
+    - Any callable will be interpreted as a StrategyCallable and returned as-is.
+    - `None` will call `get_automatic_strategy()`.
+    """
+    match strategy:
+        case None:
+            return get_automatic_strategy()
+        case Strategy():
+            return strategy
+        case str() as strategy_name:
+            strategy_name = strategy_name.strip().lower().replace("-", "_")
+            if strategy_name == "openai":
+                return OpenAIEmbeddingStrategy()
+            elif strategy_name == "nomic":
+                return NomicEmbeddingStrategy()
+            else:
+                try:
+                    return PairwiseStrategy(strategy_name)
+                except KeyError:
+                    raise ValueError(
+                        f"Strategy name {strategy_name!r} must be "
+                        '"openai", '
+                        '"nomic", '
+                        "or any valid similarity function name, "
+                        'e.g. "jaro_winkler"'
+                    )
+        case _ if callable(strategy):
+            return strategy
+        case _:
+            raise TypeError(
+                "strategy argument must be None, "
+                "a strategy name, "
+                "a similarity function name, "
+                "a Strategy instance, "
+                "or any compatible callable."
+            )
+
+
 def get_automatic_strategy() -> Strategy:
     """
     Tries to instantiate an similarity Strategy in this order:
         1. `OpenAIEmbeddingStrategy`
         2.`PairwiseStrategy`
     """
-    global cached_strategy
+    global _cached_strategy
 
-    if cached_strategy:
+    if _cached_strategy:
         logger.debug("Using cached jellyjoin.Strategy.")
-        return cached_strategy
+        return _cached_strategy
 
     try:
         strategy = OpenAIEmbeddingStrategy()
-        cached_strategy = strategy
+        _cached_strategy = strategy
         logger.debug("Instantiated and cached OpenAIEmbeddingStrategy.")
         return strategy
     except Exception:

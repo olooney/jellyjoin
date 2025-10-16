@@ -1,5 +1,6 @@
 import os
 import re
+from functools import wraps
 
 import dotenv
 import numpy as np
@@ -8,13 +9,35 @@ import pandas.testing as pdt
 import pytest
 
 import jellyjoin
-from jellyjoin import levenshtein_similarity
 
 # -----------------------
 # Fixtures
 # -----------------------
 
 dotenv.load_dotenv()
+
+
+def skip_if_openai_not_available(test_func):
+    """Skip a test if OpenAI dependencies or credentials are missing."""
+
+    @pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+    @wraps(test_func)
+    def wrapper(*args, **kwargs):
+        pytest.importorskip("openai", reason="openai package not installed")
+        return test_func(*args, **kwargs)
+
+    return wrapper
+
+
+def skip_if_nomic_not_available(test_func):
+    """Skip test if the Nomic package is not installed."""
+
+    @wraps(test_func)
+    def wrapper(*args, **kwargs):
+        pytest.importorskip("nomic", reason="nomic package not installed")
+        return test_func(*args, **kwargs)
+
+    return wrapper
 
 
 @pytest.fixture()
@@ -112,7 +135,7 @@ def pairwise_strategy_jw_lower():
 
 @pytest.fixture
 def pairwise_strategy_levenshtein():
-    return jellyjoin.PairwiseStrategy(levenshtein_similarity)
+    return jellyjoin.PairwiseStrategy(jellyjoin.levenshtein_similarity)
 
 
 @pytest.fixture(scope="session")
@@ -180,16 +203,15 @@ def test_pairwise_strategy_square(pairwise_strategy_default, left_sections):
     assert np.all(np.isclose(np.diag(matrix), 1.0))
 
 
+@skip_if_nomic_not_available
 def test_nomic_strategy_defaults(left_words, right_words):
-    pytest.importorskip("nomic", reason="nomic package not installed")
     nomic_strategy = jellyjoin.NomicEmbeddingStrategy()
     matrix = nomic_strategy(left_words, right_words)
     assert matrix.shape == (len(left_words), len(right_words))
 
 
+@skip_if_nomic_not_available
 def test_nomic_strategy_config(left_words, right_words):
-    pytest.importorskip("nomic", reason="nomic package not installed")
-
     nomic_strategy = jellyjoin.NomicEmbeddingStrategy(
         embedding_model="nomic-embed-text-v1.5",
         preprocessor=lambda x: x.lower(),
@@ -205,7 +227,7 @@ def test_nomic_strategy_config(left_words, right_words):
 
 
 def test_triple_join():
-    from jellyjoin.join import triple_join
+    from jellyjoin.join import _triple_join
 
     left = pd.DataFrame(
         {"x": [1, 2, 3], "name": ["aa", "bb", "cc"], "Left": [True] * 3}
@@ -217,7 +239,9 @@ def test_triple_join():
         {"y": [1, 2, 3], "name": ["AA", "BB", "CC"], "Right": [False] * 3}
     )
 
-    result = triple_join(left, middle, right, how="inner", suffixes=("_left", "_right"))
+    result = _triple_join(
+        left, middle, right, how="inner", suffixes=("_left", "_right")
+    )
 
     expected_columns = [
         "Left",
@@ -317,6 +341,21 @@ def test_jellyjoin_with_lists(left_sections, right_sections):
     assert df["Similarity"].between(0.0, 1.0).all()
 
 
+def test_jellyjoin_return_similarity_matrix(left_words, right_words):
+    df, matrix = jellyjoin.jellyjoin(
+        left_words,
+        right_words,
+        return_similarity_matrix=True,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == min(len(left_words), len(right_words))
+    assert df["Similarity"].between(0.0, 1.0).all()
+
+    assert isinstance(matrix, np.ndarray)
+    assert matrix.shape == (len(left_words), len(right_words))
+
+
 @pytest.mark.parametrize("how", ["inner", "left", "right", "outer"])
 def test_jellyjoin_with_dataframes_all_hows(left_df, right_df, how):
     df = jellyjoin.jellyjoin(
@@ -345,7 +384,7 @@ def test_jellyjoin_allow_many(left_df, right_df, allow_many):
     assert df["Similarity"].between(0.0, 1.0).all()
 
 
-@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+@skip_if_openai_not_available
 def test_openai_strategy(openai_strategy, left_sections, right_sections):
     matrix = openai_strategy(left_sections, right_sections)
     assert isinstance(matrix, np.ndarray)
@@ -353,17 +392,7 @@ def test_openai_strategy(openai_strategy, left_sections, right_sections):
     assert np.all(matrix >= 0.0) and np.all(matrix <= 1.0)
 
 
-# too expensive to run all the time...
-@pytest.mark.skipif(True, reason="Too expensive")
-def test_openai_strategy_batch(openai_strategy):
-    LENGTH = 5000
-    left = ["test"] * LENGTH
-    right = ["testing"]
-    matrix = openai_strategy(left, right)
-    assert matrix.shape == (LENGTH, 1)
-
-
-@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+@skip_if_openai_not_available
 def test_openai_strategy_small_batch(openai_client):
     LENGTH = 5
     strategy = jellyjoin.OpenAIEmbeddingStrategy(
@@ -376,7 +405,7 @@ def test_openai_strategy_small_batch(openai_client):
     assert matrix.shape == (LENGTH, 1)
 
 
-@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+@skip_if_openai_not_available
 def test_openai_strategy_truncate(openai_strategy):
     left = [
         "x" * 8191,
@@ -391,9 +420,93 @@ def test_openai_strategy_truncate(openai_strategy):
     assert matrix.shape == (6, 1)
 
 
-@pytest.mark.skipif("OPENAI_API_KEY" not in os.environ, reason="no API key")
+@skip_if_openai_not_available
 def test_openai_strategy_caching():
-    pytest.importorskip("openai")
     strategy1 = jellyjoin.get_automatic_strategy()
     strategy2 = jellyjoin.get_automatic_strategy()
     assert strategy1 is strategy2
+
+
+def test_get_similarity_function():
+    get_similarity_function = jellyjoin.get_similarity_function
+
+    # default
+    out = get_similarity_function(None)
+    assert out is jellyjoin.damerau_levenshtein_similarity
+
+    # Callable passthrough (identity)
+    g = lambda a, b: 1.0  # noqa: E731
+    out = get_similarity_function(g)
+    assert out is g
+
+    # Exact names map correctly
+    assert get_similarity_function("hamming") is jellyjoin.hamming_similarity
+    assert get_similarity_function("levenshtein") is jellyjoin.levenshtein_similarity
+    assert (
+        get_similarity_function("damerau_levenshtein")
+        is jellyjoin.damerau_levenshtein_similarity
+    )
+    assert get_similarity_function("jaro") is jellyjoin.jaro_similarity
+    assert get_similarity_function("jaro_winkler") is jellyjoin.jaro_winkler_similarity
+
+    # Normalization: case, whitespace, hyphen→underscore
+    assert get_similarity_function("  JARO  ") is jellyjoin.jaro_similarity
+    assert get_similarity_function("jaro-winkler") is jellyjoin.jaro_winkler_similarity
+    assert get_similarity_function("LeVeNsHtEiN") is jellyjoin.levenshtein_similarity
+
+    # raise for other
+    with pytest.raises(KeyError):
+        jellyjoin.get_similarity_function("whatever")
+
+
+def test_get_similarity_strategy():
+    # default to automatic strategy
+    output = jellyjoin.get_similarity_strategy()
+    assert isinstance(output, jellyjoin.Strategy)
+
+    output = jellyjoin.get_similarity_strategy(None)
+    assert isinstance(output, jellyjoin.Strategy)
+
+    # pass through a Strategy subclass
+    strategy = jellyjoin.PairwiseStrategy()
+    output = jellyjoin.get_similarity_strategy(strategy)
+    assert output is strategy
+
+    # pass through a callable
+    def custom_function(x, y):
+        return 0.0
+
+    output = jellyjoin.get_similarity_strategy(custom_function)
+    assert output is custom_function
+
+    # delegate to pairwise
+    for strategy in ["jaro_winkler", "Jaro-Winkler", " JaRo"]:
+        output = jellyjoin.get_similarity_strategy(strategy)
+        assert isinstance(output, jellyjoin.PairwiseStrategy)
+
+    with pytest.raises(ValueError, match=r"^Strategy name 'whatever' must"):
+        jellyjoin.get_similarity_strategy("whatever")
+
+    # raise for anything else
+    with pytest.raises(TypeError):
+        jellyjoin.get_similarity_strategy(123)
+
+
+@skip_if_openai_not_available
+def test_get_similarity_strategy_openai(left_words, right_words):
+    for strategy in ("openai", "OpenAI", " openai "):
+        output = jellyjoin.get_similarity_strategy(strategy)
+        assert isinstance(output, jellyjoin.OpenAIEmbeddingStrategy)
+
+    df = jellyjoin.jellyjoin(left_words, right_words, strategy="openai")
+    assert isinstance(df, pd.DataFrame)
+
+
+@skip_if_nomic_not_available
+def test_get_similarity_strategy_nomic(left_words, right_words):
+    for strategy in ["nomic", "NoMiC", " nomic "]:
+        output = jellyjoin.get_similarity_strategy(strategy)
+        assert isinstance(output, jellyjoin.NomicEmbeddingStrategy)
+
+    df = jellyjoin.jellyjoin(left_words, right_words, strategy="nomic")
+    assert isinstance(df, pd.DataFrame)
