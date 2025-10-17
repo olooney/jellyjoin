@@ -153,7 +153,7 @@ FUNCTION_MAP = {
 
 
 def get_similarity_function(
-    function: SimilarityLike,
+    function: SimilarityLike | None,
 ) -> SimilarityCallable:
     """
     Resolve a string identifier to a string similarity function.
@@ -178,7 +178,7 @@ def get_similarity_function(
         If the name does not correspond to a known similarity function.
     """
 
-    # a reasonably good generic default
+    # a good generic default
     if function is None:
         return damerau_levenshtein_similarity
 
@@ -186,5 +186,5 @@ def get_similarity_function(
     if callable(function):
         return function
 
-    key = function.strip().lower().replace("-", "_")
+    key = function.strip().lower().replace("-", "_").removesuffix("_similarity")
     return FUNCTION_MAP[key]

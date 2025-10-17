@@ -1,11 +1,17 @@
 - [ ] README custom similarity strategy
 - [ ] README Algorithm  and Diagrams
 - [ ] Review README against recent API changes
-
+- [ ] allow custom Mahalanobis distances with PSD matrix
+- [ ] shorten `association_column_names`
+- [X] Literals for similaritylike and strategylike
+- [X] Rename ABC to SimilarityStrategy
 - [X] Return similarity matrix along with dataframe?
 - [ ] Other Embedding Models
     - [X] implemented local nomic
     - [ ] Ollama embedding models
+- [ ] use uv to walk back to older package versions
+- [ ] 100% code coverage?
+- [ ] beta release
 
 Backlog
 -------
@@ -14,7 +20,6 @@ Backlog
 - [ ] unit tests for plots?
 - [ ] Dedupe / clustering?
 - [ ] biclustering approach?
-- [ ] allow custom Mahalanobis distances with PSD matrix?
 - [ ] support polars?
 - [ ] CLI tool
 

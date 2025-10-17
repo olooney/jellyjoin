@@ -16,6 +16,13 @@ import jellyjoin
 
 dotenv.load_dotenv()
 
+# not a fixture; used for parameterize
+empties = [
+    ([], ["X"]),  # left empty
+    (["X"], []),  # right empty
+    ([], []),  # both empty
+]
+
 
 def skip_if_openai_not_available(test_func):
     """Skip a test if OpenAI dependencies or credentials are missing."""
@@ -161,6 +168,13 @@ def test_version():
     assert jellyjoin.__version__ > "0.0.0"
 
 
+@pytest.mark.parametrize("fn", jellyjoin.similarity.FUNCTION_MAP.values())
+def test_similarity_functions(fn):
+    assert fn("abcdefg", "abcdefg") == pytest.approx(1.0)
+    assert fn("abcdefg", "hijklmn") == pytest.approx(0.0)
+    assert 0.1 < fn("abcdefg", "acbdfgh") < 0.9
+
+
 def test_pairwise_strategy_defaults(pairwise_strategy_default, left_words, right_words):
     matrix = pairwise_strategy_default(left_words, right_words)
     expected = np.array(
@@ -259,16 +273,14 @@ def test_triple_join():
     assert result["name_right"].tolist() == ["CC", "AA", "BB"]
 
 
-@pytest.mark.parametrize(
-    "left,right",
-    [
-        ([], ["X"]),  # left empty
-        (["X"], []),  # right empty
-        ([], []),  # both empty
-    ],
-)
-def test_jellyjoin_empty(left, right):
-    df = jellyjoin.jellyjoin(left, right)
+@pytest.mark.parametrize("left,right", empties)
+def test_pairwise_jellyjoin_empty(left, right):
+    df, matrix = jellyjoin.jellyjoin(
+        left,
+        right,
+        strategy="jaro",
+        return_similarity_matrix=True,
+    )
     assert df.columns.tolist() == [
         "Left",
         "Right",
@@ -277,6 +289,26 @@ def test_jellyjoin_empty(left, right):
         "Right Value",
     ]
     assert len(df) == 0
+    assert isinstance(matrix, np.ndarray)
+    assert matrix.shape == (len(left), len(right))
+
+
+@skip_if_openai_not_available
+@pytest.mark.parametrize("left,right", empties)
+def test_openai_empty(left, right):
+    strategy = jellyjoin.get_similarity_strategy("openai")
+    matrix = strategy(left, right)
+    assert isinstance(matrix, np.ndarray)
+    assert matrix.shape == (len(left), len(right))
+
+
+@skip_if_nomic_not_available
+@pytest.mark.parametrize("left,right", empties)
+def test_nomic_empty(left, right):
+    strategy = jellyjoin.get_similarity_strategy("nomic")
+    matrix = strategy(left, right)
+    assert isinstance(matrix, np.ndarray)
+    assert matrix.shape == (len(left), len(right))
 
 
 def test_jellyjoin_options():
@@ -462,10 +494,10 @@ def test_get_similarity_function():
 def test_get_similarity_strategy():
     # default to automatic strategy
     output = jellyjoin.get_similarity_strategy()
-    assert isinstance(output, jellyjoin.Strategy)
+    assert isinstance(output, jellyjoin.SimilarityStrategy)
 
     output = jellyjoin.get_similarity_strategy(None)
-    assert isinstance(output, jellyjoin.Strategy)
+    assert isinstance(output, jellyjoin.SimilarityStrategy)
 
     # pass through a Strategy subclass
     strategy = jellyjoin.PairwiseStrategy()
@@ -480,9 +512,15 @@ def test_get_similarity_strategy():
     assert output is custom_function
 
     # delegate to pairwise
-    for strategy in ["jaro_winkler", "Jaro-Winkler", " JaRo"]:
+    for strategy in [
+        "jaro_winkler",
+        "Jaro-Winkler",
+        " JaRo-WiNkLeR ",
+        "jaro_winkler_similarity",
+    ]:
         output = jellyjoin.get_similarity_strategy(strategy)
         assert isinstance(output, jellyjoin.PairwiseStrategy)
+        assert output.similarity_function is jellyjoin.jaro_winkler_similarity
 
     with pytest.raises(ValueError, match=r"^Strategy name 'whatever' must"):
         jellyjoin.get_similarity_strategy("whatever")

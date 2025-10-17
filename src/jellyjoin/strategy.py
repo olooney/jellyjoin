@@ -11,13 +11,13 @@ from .typing import (
     PreprocessorCallable,
     SimilarityCallable,
     SimilarityLike,
-    Strategy,
+    SimilarityStrategy,
     StrategyCallable,
     StrategyLike,
 )
 
 __all__ = [
-    "Strategy",
+    "SimilarityStrategy",
     "EmbeddingStrategy",
     "OpenAIEmbeddingStrategy",
     "NomicEmbeddingStrategy",
@@ -40,7 +40,7 @@ def identity(x: str) -> str:
     return x
 
 
-class EmbeddingStrategy(Strategy):
+class EmbeddingStrategy(SimilarityStrategy):
     """
     Base class for Strategies that use an embedding model to calculate
     similarities. Implement the abstract `call_embedding_api()` method
@@ -261,7 +261,7 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         return np.array(result["embeddings"], dtype=self.dtype)
 
 
-class PairwiseStrategy(Strategy):
+class PairwiseStrategy(SimilarityStrategy):
     """
     A simpler, non-vectorized similarity strategy which calls a
     similarity function for every possible pair of strings from the left
@@ -270,7 +270,7 @@ class PairwiseStrategy(Strategy):
 
     def __init__(
         self,
-        similarity_function: SimilarityLike = None,
+        similarity_function: SimilarityLike | None = None,
         preprocessor: PreprocessorCallable = identity,
     ):
         """
@@ -308,7 +308,7 @@ class PairwiseStrategy(Strategy):
 
 def get_similarity_strategy(
     strategy: StrategyLike | None = None,
-) -> Strategy | StrategyCallable:
+) -> SimilarityStrategy | StrategyCallable:
     """
     Resolves a strategy identifier to a strategy class.
 
@@ -321,10 +321,10 @@ def get_similarity_strategy(
     match strategy:
         case None:
             return get_automatic_strategy()
-        case Strategy():
+        case SimilarityStrategy():
             return strategy
         case str() as strategy_name:
-            strategy_name = strategy_name.strip().lower().replace("-", "_")
+            strategy_name = strategy_name.strip().lower()
             if strategy_name == "openai":
                 return OpenAIEmbeddingStrategy()
             elif strategy_name == "nomic":
@@ -352,7 +352,7 @@ def get_similarity_strategy(
             )
 
 
-def get_automatic_strategy() -> Strategy:
+def get_automatic_strategy() -> SimilarityStrategy:
     """
     Tries to instantiate an similarity Strategy in this order:
         1. `OpenAIEmbeddingStrategy`

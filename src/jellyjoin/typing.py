@@ -5,7 +5,7 @@ from typing import Callable, Literal, TypeAlias
 import numpy as np
 
 
-class Strategy(ABC):
+class SimilarityStrategy(ABC):
     @abstractmethod
     def __call__(
         self,
@@ -15,7 +15,6 @@ class Strategy(ABC):
         """
         Abstract Base Class for all similarity strategy classes.
         """
-        pass
 
 
 # function signatures
@@ -24,8 +23,22 @@ SimilarityCallable: TypeAlias = Callable[[str, str], float]
 PreprocessorCallable: TypeAlias = Callable[[str], str]
 
 # Lists of things that can be coerced into specific types
-SimilarityLike: TypeAlias = str | SimilarityCallable | None
-StrategyLike: TypeAlias = str | Strategy | StrategyCallable | None
+SimilarityLiteral: TypeAlias = Literal[
+    "hamming",
+    "levenshtein",
+    "damerau_levenshtein",
+    "jaro",
+    "jaro_winkler",
+]
+SimilarityLike: TypeAlias = SimilarityLiteral | SimilarityCallable
+
+StrategyLiteral: TypeAlias = Literal[
+    "openai",
+    "nomic",
+]
+StrategyLike: TypeAlias = (
+    SimilarityStrategy | StrategyLiteral | SimilarityLiteral | StrategyCallable
+)
 
 # types used by join
 HowLiteral = Literal["inner", "left", "right", "outer"]

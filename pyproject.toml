@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.2.5"
+version = "0.2.6"
 description = "Utilities for dataset similarity and joins"
 authors = [{ name = "Oran Looney", email = "olooney@gmail.com" }]
 readme = "README.md"
@@ -38,6 +38,7 @@ dev = [
     "nomic>=3.6.0",
     "pre-commit",
     "pytest",
+    "pytest-cov>=7.0.0",
     "python-dotenv",
     "ruff",
     "twine",
@@ -58,3 +59,7 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 ignore = ["E501", "F403"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=src/jellyjoin --cov-report=term-missing"
+testpaths = ["tests"]

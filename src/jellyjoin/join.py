@@ -180,11 +180,11 @@ def jellyjoin(
     on: str | None = None,
     left_on: str | None = None,
     right_on: str | None = None,
-    strategy: StrategyLike = None,
+    strategy: StrategyLike | None = None,
     threshold: float = 0.0,
     allow_many: AllowManyLiteral = "neither",
     how: HowLiteral = "inner",
-    association_column_names: Collection = ("Left", "Right", "Similarity"),
+    association_column_names: Tuple[str, str, str] = ("Left", "Right", "Similarity"),
     suffixes: Collection = ("_left", "_right"),
     return_similarity_matrix: bool = False,
 ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:

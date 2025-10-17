@@ -1,7 +1,7 @@
 dist/
 notebooks/
 REVIEW.md
-dump.py
+.coverage
 
 # Byte-compiled / cache files
 __pycache__/
