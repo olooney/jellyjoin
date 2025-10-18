@@ -167,6 +167,12 @@ TODO: Configuring custom similarity strategies
 
 TODO: Hungarian Algorithm.
 
+You'll need to have ollama running, and pull the embedding model you want, e.g.:
+
+```
+ollama pull nomic-embed-text:v1.5
+```
+
 
 ## Development
 

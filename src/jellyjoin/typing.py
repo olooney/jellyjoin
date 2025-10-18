@@ -35,6 +35,7 @@ SimilarityLike: TypeAlias = SimilarityLiteral | SimilarityCallable
 StrategyLiteral: TypeAlias = Literal[
     "openai",
     "nomic",
+    "ollama",
 ]
 StrategyLike: TypeAlias = (
     SimilarityStrategy | StrategyLiteral | SimilarityLiteral | StrategyCallable

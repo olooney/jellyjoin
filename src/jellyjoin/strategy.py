@@ -4,6 +4,7 @@ from typing import List, Literal
 
 import numpy as np
 import tiktoken
+from numpy.linalg import norm
 from numpy.typing import ArrayLike, DTypeLike
 
 from .similarity import get_similarity_function
@@ -21,6 +22,7 @@ __all__ = [
     "EmbeddingStrategy",
     "OpenAIEmbeddingStrategy",
     "NomicEmbeddingStrategy",
+    "OllamaEmbeddingStrategy",
     "PairwiseStrategy",
     "get_similarity_strategy",
     "get_automatic_strategy",
@@ -74,13 +76,13 @@ class EmbeddingStrategy(SimilarityStrategy):
         """
         Compute an NxM matrix of similarities using an embedding model.
         """
+        if not len(left_texts):
+            return np.zeros((0, len(right_texts)))
+        elif not len(right_texts):
+            return np.zeros((len(left_texts), 0))
+
         left_texts = [self.preprocessor(text) for text in left_texts]
         right_texts = [self.preprocessor(text) for text in right_texts]
-
-        if not left_texts:
-            return np.zeros((0, len(right_texts)))
-        elif not right_texts:
-            return np.zeros((len(left_texts), 0))
 
         # compute embeddings
         left_embeddings = self.embed(left_texts)
@@ -126,11 +128,17 @@ class OpenAIEmbeddingStrategy(EmbeddingStrategy):
             Data type of the returned embedding arrays. Defaults to `np.float32`.
         """
         if client is None:
+            # deferred import of optional dependency
             import openai
 
             self.client = openai.OpenAI()
         else:
             self.client = client
+
+        if not isinstance(embedding_model, str):
+            raise TypeError(
+                "embedding_model must be the name of an OpenAI embedding model as a string."
+            )
 
         self.embedding_model = embedding_model
         self.batch_size = int(batch_size)
@@ -180,8 +188,11 @@ class OpenAIEmbeddingStrategy(EmbeddingStrategy):
         Returns a matrix of shape `(len(texts), D)`, where `D` is the number of
         dimensions of the embedding vectors.
         """
-        all_vectors = []
+        if not len(texts):
+            return np.zeros((0, 0), dtype=self.dtype)
 
+        # batch calls to the API so we stay under the limit
+        all_vectors = []
         for i in range(0, len(texts), self.batch_size):
             raw_batch = texts[i : i + self.batch_size]
             batch = [self._truncate(text) for text in raw_batch]
@@ -232,8 +243,13 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         dtype:
             Data type of the returned embedding arrays. Defaults to `np.float32`.
         """
-        # deferred import of nomic.
+        # deferred import of optional dependency
         import nomic.embed as nomic_embed
+
+        if not isinstance(embedding_model, str):
+            raise TypeError(
+                "embedding_model must be the name of a Nomic embedding model as a string."
+            )
 
         self.nomic_embed = nomic_embed
 
@@ -247,6 +263,13 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         super().__init__(preprocessor=preprocessor)
 
     def embed(self, texts: Collection[str]) -> np.ndarray:
+        """
+        Return embeddings for `texts` with shape (len(texts), D).
+        """
+        if not len(texts):
+            return np.zeros((0, 0), dtype=self.dtype)
+
+        # nomic does its own batching under the hood
         result = self.nomic_embed.text(
             texts=texts,
             model=self.embedding_model,
@@ -259,6 +282,76 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         )
 
         return np.array(result["embeddings"], dtype=self.dtype)
+
+
+class OllamaEmbeddingStrategy(EmbeddingStrategy):
+    def __init__(
+        self,
+        client=None,
+        host: str | None = None,
+        embedding_model: str = "nomic-embed-text:v1.5",
+        preprocessor: PreprocessorCallable = identity,
+        dtype: DTypeLike = np.float32,
+    ):
+        """
+        client:
+          pass an existing Ollama Client object if you have one.
+        host:
+          Cannot be passed if client is passed. Ollama will default
+          to "http://localhost:11434" if None is passed.
+        embedding_model:
+          name of the embedding model used by Ollama in the format
+          "{model_name}:{version}".
+        preprocessor:
+            A callable applied to each text before embedding. Defaults to `identity`.
+        dtype:
+            Data type of the returned embedding arrays. Defaults to `np.float32`.
+        """
+        # deferred import of optional dependency
+        from ollama import Client
+
+        # validate args
+        if client and not isinstance(client, Client):
+            typename = f"{Client.__module__}.{Client.__qualname__}"
+            raise TypeError(f"client, if not None, should be of type {typename!r}")
+        if client and host:
+            raise ValueError(
+                "Do not pass both client and host arguments; host "
+                "is only used to instantiate a new client internally."
+            )
+        if not isinstance(embedding_model, str):
+            raise TypeError(
+                "embedding_model must be the name of an Ollama embedding model as a string."
+            )
+
+        self.client = client or Client()
+        self.embedding_model = embedding_model
+        self.dtype = dtype
+        super().__init__(preprocessor=preprocessor)
+
+    def _call_ollama_api(self, text: str) -> np.ndarray:
+        vector = self.client.embeddings(
+            model=self.embedding_model,
+            prompt=text,
+        )["embedding"]
+        return vector / norm(vector)
+
+    def embed(self, texts: Collection[str]) -> np.ndarray:
+        """
+        Return embeddings for `texts` with shape (len(texts), D).
+        Each text is sent in its own request (no batching).
+        """
+        if not len(texts):
+            return np.zeros((0, 0), dtype=self.dtype)
+
+        # we need to call the ollama embeddings API once per text because it simply
+        # doesn't support multiple texts.
+        vectors = []
+        for text in texts:
+            vector = self._call_ollama_api(text)
+            vectors.append(vector)
+
+        return np.stack(vectors, dtype=self.dtype)
 
 
 class PairwiseStrategy(SimilarityStrategy):
@@ -329,6 +422,8 @@ def get_similarity_strategy(
                 return OpenAIEmbeddingStrategy()
             elif strategy_name == "nomic":
                 return NomicEmbeddingStrategy()
+            elif strategy_name == "ollama":
+                return OllamaEmbeddingStrategy()
             else:
                 try:
                     return PairwiseStrategy(strategy_name)
@@ -337,6 +432,7 @@ def get_similarity_strategy(
                         f"Strategy name {strategy_name!r} must be "
                         '"openai", '
                         '"nomic", '
+                        '"ollama", '
                         "or any valid similarity function name, "
                         'e.g. "jaro_winkler"'
                     )

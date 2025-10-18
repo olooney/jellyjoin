@@ -36,6 +36,17 @@ def skip_if_nomic_not_available(test_func):
     return wrapper
 
 
+def skip_if_ollama_not_available(test_func):
+    """Skip test if the Ollama package is not installed."""
+
+    @wraps(test_func)
+    def wrapper(*args, **kwargs):
+        pytest.importorskip("ollama", reason="ollama package not installed")
+        return test_func(*args, **kwargs)
+
+    return wrapper
+
+
 # -----------------------
 # Fixtures
 # -----------------------
@@ -295,6 +306,11 @@ def test_openai_empty(empties):
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
 
+    # test zero length vectors with .embed() directly
+    embedding_vectors = strategy.embed([])
+    assert embedding_vectors.ndim == 2
+    assert len(embedding_vectors) == 0
+
 
 @skip_if_nomic_not_available
 def test_nomic_empty(empties):
@@ -303,6 +319,72 @@ def test_nomic_empty(empties):
     matrix = strategy(left, right)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
+
+    # test zero length vectors with .embed() directly
+    embedding_vectors = strategy.embed([])
+    assert embedding_vectors.ndim == 2
+    assert len(embedding_vectors) == 0
+
+
+@skip_if_ollama_not_available
+def test_ollama_empty(empties):
+    left, right = empties
+    strategy = jj.get_similarity_strategy("ollama")
+    matrix = strategy(left, right)
+    assert isinstance(matrix, np.ndarray)
+    assert matrix.shape == (len(left), len(right))
+
+    # test zero length vectors with .embed() directly
+    embedding_vectors = strategy.embed([])
+    assert embedding_vectors.ndim == 2
+    assert len(embedding_vectors) == 0
+
+
+@skip_if_openai_not_available
+def test_openai_validation():
+    with pytest.raises(
+        TypeError,
+        match=r"embedding_model must be the name of an OpenAI embedding model as a string\.",
+    ):
+        jj.OpenAIEmbeddingStrategy(embedding_model=123)
+
+    # TODO additional validation
+
+
+@skip_if_nomic_not_available
+def test_nomic_validation():
+    with pytest.raises(
+        TypeError,
+        match=r"embedding_model must be the name of a Nomic embedding model as a string\.",
+    ):
+        jj.NomicEmbeddingStrategy(embedding_model=123)
+
+
+@skip_if_ollama_not_available
+def test_ollama_validation():
+    with pytest.raises(
+        TypeError,
+        match=r"client, if not None, should be of type 'ollama._client\.Client'",
+    ):
+        jj.OllamaEmbeddingStrategy(client=42)
+
+    import ollama
+
+    client = ollama.Client()
+    with pytest.raises(
+        ValueError,
+        match=r"Do not pass both client and host arguments; host is only used to instantiate a new client internally\.",
+    ):
+        jj.OllamaEmbeddingStrategy(
+            client=client,
+            host="http://localhost:11434",
+        )
+
+    with pytest.raises(
+        TypeError,
+        match=r"embedding_model must be the name of an Ollama embedding model as a string\.",
+    ):
+        jj.OllamaEmbeddingStrategy(embedding_model=123)
 
 
 def test_jellyjoin_validation():
@@ -604,4 +686,14 @@ def test_get_similarity_strategy_nomic(left_words, right_words):
         assert isinstance(output, jj.NomicEmbeddingStrategy)
 
     df = jj.jellyjoin(left_words, right_words, strategy="nomic")
+    assert isinstance(df, pd.DataFrame)
+
+
+@skip_if_ollama_not_available
+def test_get_similarity_strategy_ollama(left_words, right_words):
+    for strategy in ["ollama", "Ollama", " ollama "]:
+        output = jj.get_similarity_strategy(strategy)
+        assert isinstance(output, jj.OllamaEmbeddingStrategy)
+
+    df = jj.jellyjoin(left_words, right_words, strategy="ollama")
     assert isinstance(df, pd.DataFrame)
