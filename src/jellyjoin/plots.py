@@ -1,4 +1,3 @@
-# jellyjoin/plots.py
 from __future__ import annotations
 
 from typing import Iterable, Tuple
@@ -29,6 +28,42 @@ def plot_similarity_matrix(
     title: str = "Similarity Matrix",
     show_colorbar: bool = True,
 ) -> Tuple[Figure, Axes]:
+    """
+    Display a 2D similarity matrix as a labeled heatmap. This function
+    uses `matplotlib.pyplot` but does not call `show()`.
+
+    Parameters
+    ----------
+    similarity_matrix : np.ndarray
+        Two-dimensional array of similarity scores to visualize.
+    ax : matplotlib.axes.Axes, optional
+        Existing Axes to draw into. If None (default), a new Figure and Axes
+        are created.
+    figsize : tuple of float, optional
+        Figure size in inches when `ax` is None. Defaults to Matplotlib's
+        rcParams["figure.figsize"] if not provided.
+    left_labels : iterable of str, optional
+        Labels for the matrix rows (typically corresponding to "left" entities).
+    right_labels : iterable of str, optional
+        Labels for the matrix columns (typically corresponding to "right" entities).
+    cmap : str, default="Blues"
+        Matplotlib colormap name used for the heatmap.
+    annotate : bool, default=True
+        Whether to draw numeric similarity values inside each cell.
+    annotation_fontsize : int, default=6
+        Font size for numeric annotations.
+    label_fontsize : int, default=9
+        Font size for axis tick labels.
+    title : str, default="Similarity Matrix"
+        Title for the plot.
+    show_colorbar : bool, default=True
+        Whether to display a colorbar alongside the heatmap.
+
+    Returns
+    -------
+    (matplotlib.figure.Figure, matplotlib.axes.Axes)
+        The created or modified figure and axes objects.
+    """
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
@@ -94,6 +129,51 @@ def plot_associations(
     label_fontsize: int = 10,
     title: str | None = None,
 ) -> Tuple[Figure, Axes]:
+    """
+    Display a "connect-the-dots" plot showing pairwise associations between
+    left and right values. This function uses `matplotlib.pyplot` but does not
+    call `show()`.
+
+    Parameters
+    ----------
+    association_df : pandas.DataFrame
+        DataFrame containing matched pairs of left and right values along with
+        their corresponding indices. Must include columns specified by
+        `left_column`, `right_column`, `left_index_column`, and `right_index_column`.
+    ax : matplotlib.axes.Axes, optional
+        Existing Axes to draw into. If None (default), a new Figure and Axes
+        are created.
+    figsize : tuple of float, optional
+        Figure size in inches when creating a new figure. Defaults to
+        Matplotlib's rcParams["figure.figsize"] if not provided.
+    indent : float, default=0.2
+        Horizontal offset (0–1) from plot edge where left and right nodes are drawn.
+    text_gap : float, default=0.02
+        Horizontal distance between dots and text labels.
+    left_column : str, default="Left Value"
+        Column name for labels on the left side.
+    right_column : str, default="Right Value"
+        Column name for labels on the right side.
+    left_index_column : str, default="Left"
+        Column containing integer row indices for the left items.
+    right_index_column : str, default="Right"
+        Column containing integer row indices for the right items.
+    marker_color : str, default="black"
+        Color for the dots representing items.
+    line_color : str, default="gray"
+        Color for the lines connecting left and right items.
+    line_width : float, default=0.8
+        Width of connecting lines.
+    label_fontsize : int, default=10
+        Font size for text labels.
+    title : str, optional
+        Optional title to display above the plot.
+
+    Returns
+    -------
+    (matplotlib.figure.Figure, matplotlib.axes.Axes)
+        The created or modified figure and axes objects.
+    """
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:

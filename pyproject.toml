@@ -51,6 +51,12 @@ test = [
     "matplotlib>=3.8.4",
 ]
 
+extra = [
+    "matplotlib>=3.8.4",
+    "openai>=1.61.1",
+    "nomic>=3.6.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -1,7 +1,8 @@
 - [ ] README custom similarity strategy
-- [ ] README Algorithm  and Diagrams
-- [ ] Review README against recent API changes
-- [ ] allow custom Mahalanobis distances with PSD matrix
+- [ ] README Algorithm and Diagrams
+- [X] Review README against recent API changes
+- [X] jellyjoin() docstring
+
 - [X] shorten `association_column_names`
 - [X] Literals for similaritylike and strategylike
 - [X] Rename ABC to SimilarityStrategy
@@ -10,14 +11,15 @@
     - [X] implemented local nomic
     - [ ] Ollama embedding models
 - [ ] use uv to walk back to older package versions
-- [ ] 100% code coverage?
+- [X] 100% code coverage?
+- [X] unit tests for plots?
 - [ ] beta release
 
 Backlog
 -------
 
+- [ ] allow custom Mahalanobis distances with PSD matrix
 - [ ] join option for blocking?
-- [ ] unit tests for plots?
 - [ ] Dedupe / clustering?
 - [ ] biclustering approach?
 - [ ] support polars?

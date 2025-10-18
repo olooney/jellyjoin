@@ -8,16 +8,9 @@ import pandas as pd
 import pandas.testing as pdt
 import pytest
 
-import jellyjoin
+import jellyjoin as jj
 
 dotenv.load_dotenv()
-
-# not a fixture; used for parameterize
-empties = [
-    ([], ["X"]),  # left empty
-    (["X"], []),  # right empty
-    ([], []),  # both empty
-]
 
 
 def skip_if_openai_not_available(test_func):
@@ -129,21 +122,8 @@ def right_df():
 
 
 @pytest.fixture
-def pairwise_strategy_default():
-    return jellyjoin.PairwiseStrategy()
-
-
-@pytest.fixture
-def pairwise_strategy_jw_lower():
-    return jellyjoin.PairwiseStrategy(
-        "jaro-winkler",
-        preprocessor=lambda x: x.lower(),
-    )
-
-
-@pytest.fixture
-def pairwise_strategy_levenshtein():
-    return jellyjoin.PairwiseStrategy(jellyjoin.levenshtein_similarity)
+def pairwise_strategy():
+    return jj.PairwiseStrategy()
 
 
 @pytest.fixture(scope="session")
@@ -156,7 +136,15 @@ def openai_client():
 
 @pytest.fixture
 def openai_strategy(openai_client):
-    return jellyjoin.OpenAIEmbeddingStrategy(openai_client)
+    return jj.OpenAIEmbeddingStrategy(openai_client)
+
+
+@pytest.fixture(
+    params=[([], ["X"]), (["X"], []), ([], [])],
+    ids=["left-empty", "right-empty", "both-empty"],
+)
+def empties(request):
+    return request.param
 
 
 # -----------------------
@@ -165,19 +153,19 @@ def openai_strategy(openai_client):
 
 
 def test_version():
-    assert re.match(r"^\d+\.\d+\.\d+$", jellyjoin.__version__)
-    assert jellyjoin.__version__ > "0.0.0"
+    assert re.match(r"^\d+\.\d+\.\d+$", jj.__version__)
+    assert jj.__version__ > "0.0.0"
 
 
-@pytest.mark.parametrize("fn", jellyjoin.similarity.FUNCTION_MAP.values())
+@pytest.mark.parametrize("fn", jj.similarity.FUNCTION_MAP.values())
 def test_similarity_functions(fn):
     assert fn("abcdefg", "abcdefg") == pytest.approx(1.0)
     assert fn("abcdefg", "hijklmn") == pytest.approx(0.0)
     assert 0.1 < fn("abcdefg", "acbdfgh") < 0.9
 
 
-def test_pairwise_strategy_defaults(pairwise_strategy_default, left_words, right_words):
-    matrix = pairwise_strategy_default(left_words, right_words)
+def test_pairwise_strategy_default(pairwise_strategy, left_words, right_words):
+    matrix = pairwise_strategy(left_words, right_words)
     expected = np.array(
         [
             [0.33333333, 0.0, 0.0],
@@ -188,8 +176,12 @@ def test_pairwise_strategy_defaults(pairwise_strategy_default, left_words, right
     assert np.allclose(matrix, expected)
 
 
-def test_pairwise_strategy(pairwise_strategy_jw_lower, left_words, right_words):
-    matrix = pairwise_strategy_jw_lower(left_words, right_words)
+def test_pairwise_strategy(left_words, right_words):
+    strategy = jj.PairwiseStrategy(
+        "jaro-winkler",
+        preprocessor=lambda x: x.lower(),
+    )
+    matrix = strategy(left_words, right_words)
     expected = np.array(
         [
             [1.0, 0.0, 0.0],
@@ -200,17 +192,18 @@ def test_pairwise_strategy(pairwise_strategy_jw_lower, left_words, right_words):
     assert np.allclose(matrix, expected)
 
 
-def test_pairwise_strategy_with_custom_function(
-    pairwise_strategy_levenshtein, left_words, right_words
-):
-    matrix = pairwise_strategy_levenshtein(left_words, right_words)
+def test_pairwise_strategy_with_custom_function(left_words, right_words):
+    strategy = jj.PairwiseStrategy(jj.levenshtein_similarity)
+    matrix = strategy(left_words, right_words)
+
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left_words), len(right_words))
     assert np.all(matrix >= 0.0) and np.all(matrix <= 1.0)
 
 
-def test_pairwise_strategy_square(pairwise_strategy_default, left_sections):
-    matrix = pairwise_strategy_default(left_sections, left_sections)
+def test_pairwise_strategy_square(pairwise_strategy, left_sections):
+    matrix = pairwise_strategy(left_sections, left_sections)
+
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left_sections), len(left_sections))
     assert np.all(matrix >= 0.0) and np.all(matrix <= 1.0)
@@ -220,14 +213,14 @@ def test_pairwise_strategy_square(pairwise_strategy_default, left_sections):
 
 @skip_if_nomic_not_available
 def test_nomic_strategy_defaults(left_words, right_words):
-    nomic_strategy = jellyjoin.NomicEmbeddingStrategy()
+    nomic_strategy = jj.NomicEmbeddingStrategy()
     matrix = nomic_strategy(left_words, right_words)
     assert matrix.shape == (len(left_words), len(right_words))
 
 
 @skip_if_nomic_not_available
 def test_nomic_strategy_config(left_words, right_words):
-    nomic_strategy = jellyjoin.NomicEmbeddingStrategy(
+    nomic_strategy = jj.NomicEmbeddingStrategy(
         embedding_model="nomic-embed-text-v1.5",
         preprocessor=lambda x: x.lower(),
         task_type="search_query",
@@ -274,9 +267,9 @@ def test_triple_join():
     assert result["name_right"].tolist() == ["CC", "AA", "BB"]
 
 
-@pytest.mark.parametrize("left,right", empties)
-def test_pairwise_jellyjoin_empty(left, right):
-    df, matrix = jellyjoin.jellyjoin(
+def test_pairwise_jellyjoin_empty(empties):
+    left, right = empties
+    df, matrix = jj.jellyjoin(
         left,
         right,
         strategy="jaro",
@@ -295,18 +288,18 @@ def test_pairwise_jellyjoin_empty(left, right):
 
 
 @skip_if_openai_not_available
-@pytest.mark.parametrize("left,right", empties)
-def test_openai_empty(left, right):
-    strategy = jellyjoin.get_similarity_strategy("openai")
+def test_openai_empty(empties):
+    left, right = empties
+    strategy = jj.get_similarity_strategy("openai")
     matrix = strategy(left, right)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
 
 
 @skip_if_nomic_not_available
-@pytest.mark.parametrize("left,right", empties)
-def test_nomic_empty(left, right):
-    strategy = jellyjoin.get_similarity_strategy("nomic")
+def test_nomic_empty(empties):
+    left, right = empties
+    strategy = jj.get_similarity_strategy("nomic")
     matrix = strategy(left, right)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
@@ -314,53 +307,53 @@ def test_nomic_empty(left, right):
 
 def test_jellyjoin_validation():
     with pytest.raises(ValueError, match=r"Pass exactly two suffixes\."):
-        jellyjoin.jellyjoin([], [], suffixes=("only_one",))
+        jj.jellyjoin([], [], suffixes=("only_one",))
 
     with pytest.raises(ValueError, match=r"Pass exactly two suffixes\."):
-        jellyjoin.jellyjoin([], [], suffixes=("_left", "_right", "_extra"))
+        jj.jellyjoin([], [], suffixes=("_left", "_right", "_extra"))
 
     with pytest.raises(ValueError, match=r"suffixes cannot be the same\."):
-        jellyjoin.jellyjoin([], [], suffixes=("_left_foot", "_left_foot"))
+        jj.jellyjoin([], [], suffixes=("_left_foot", "_left_foot"))
 
     with pytest.raises(TypeError, match=r"suffixes\[0\] must be a string\."):
-        jellyjoin.jellyjoin([], [], suffixes=(None, "_right"))
+        jj.jellyjoin([], [], suffixes=(None, "_right"))
 
     with pytest.raises(TypeError, match=r"suffixes\[1\] must be a string\."):
-        jellyjoin.jellyjoin([], [], suffixes=("_left", 5))
+        jj.jellyjoin([], [], suffixes=("_left", 5))
 
     with pytest.raises(TypeError, match=r"suffixes\[0\] cannot be an empty string\."):
-        jellyjoin.jellyjoin([], [], suffixes=("", "_right"))
+        jj.jellyjoin([], [], suffixes=("", "_right"))
 
     with pytest.raises(TypeError, match=r"suffixes\[1\] cannot be an empty string\."):
-        jellyjoin.jellyjoin([], [], suffixes=("_left", ""))
+        jj.jellyjoin([], [], suffixes=("_left", ""))
 
     with pytest.raises(TypeError, match=r"similarity_column must be a string\."):
-        jellyjoin.jellyjoin([], [], similarity_column=123)
+        jj.jellyjoin([], [], similarity_column=123)
 
     with pytest.raises(
         ValueError, match=r"similarity_column cannot be an empty string\."
     ):
-        jellyjoin.jellyjoin([], [], similarity_column="")
+        jj.jellyjoin([], [], similarity_column="")
 
     with pytest.raises(
         ValueError, match=r'allow_many must be "left", "right", "both", or "neither"\.'
     ):
-        jellyjoin.jellyjoin([], [], allow_many="some")
+        jj.jellyjoin([], [], allow_many="some")
 
     with pytest.raises(
         ValueError, match=r'how argument must be "inner", "left", "right", or "outer"\.'
     ):
-        jellyjoin.jellyjoin([], [], how="joiny")
+        jj.jellyjoin([], [], how="joiny")
 
     with pytest.raises(
         ValueError, match=r'Pass only "on" or "left_on" and "right_on", not both\.'
     ):
-        jellyjoin.jellyjoin([], [], on="id", left_on="client_no")
+        jj.jellyjoin([], [], on="id", left_on="client_no")
 
     with pytest.raises(
         ValueError, match=r'Pass only "on" or "left_on" and "right_on", not both\.'
     ):
-        jellyjoin.jellyjoin([], [], on="id", right_on="client_no")
+        jj.jellyjoin([], [], on="id", right_on="client_no")
 
 
 def test_jellyjoin_options():
@@ -379,11 +372,11 @@ def test_jellyjoin_options():
         }
     )
 
-    df = jellyjoin.jellyjoin(
+    df = jj.jellyjoin(
         left,
         right,
         on="name",
-        strategy=jellyjoin.PairwiseStrategy("jaro-winkler"),
+        strategy=jj.PairwiseStrategy("jaro-winkler"),
         threshold=0.01,
         allow_many="left",
         how="outer",
@@ -420,7 +413,7 @@ def test_jellyjoin_options():
 
 
 def test_jellyjoin_drop_columns():
-    df = jellyjoin.jellyjoin(
+    df = jj.jellyjoin(
         ["x", "y"],
         ["y", "x"],
         left_index_column=None,
@@ -431,14 +424,14 @@ def test_jellyjoin_drop_columns():
 
 
 def test_jellyjoin_with_lists(left_sections, right_sections):
-    df = jellyjoin.jellyjoin(left_sections, right_sections)
+    df = jj.jellyjoin(left_sections, right_sections)
     assert isinstance(df, pd.DataFrame)
     assert len(df) == min(len(left_sections), len(right_sections))
     assert df["Similarity"].between(0.0, 1.0).all()
 
 
 def test_jellyjoin_return_similarity_matrix(left_words, right_words):
-    df, matrix = jellyjoin.jellyjoin(
+    df, matrix = jj.jellyjoin(
         left_words,
         right_words,
         return_similarity_matrix=True,
@@ -454,7 +447,7 @@ def test_jellyjoin_return_similarity_matrix(left_words, right_words):
 
 @pytest.mark.parametrize("how", ["inner", "left", "right", "outer"])
 def test_jellyjoin_with_dataframes_all_hows(left_df, right_df, how):
-    df = jellyjoin.jellyjoin(
+    df = jj.jellyjoin(
         left_df,
         right_df,
         left_on="API Path",
@@ -468,7 +461,7 @@ def test_jellyjoin_with_dataframes_all_hows(left_df, right_df, how):
 
 @pytest.mark.parametrize("allow_many", ["neither", "left", "right", "both"])
 def test_jellyjoin_allow_many(left_df, right_df, allow_many):
-    df = jellyjoin.jellyjoin(
+    df = jj.jellyjoin(
         left_df,
         right_df,
         left_on="API Path",
@@ -491,7 +484,7 @@ def test_openai_strategy(openai_strategy, left_sections, right_sections):
 @skip_if_openai_not_available
 def test_openai_strategy_small_batch(openai_client):
     LENGTH = 5
-    strategy = jellyjoin.OpenAIEmbeddingStrategy(
+    strategy = jj.OpenAIEmbeddingStrategy(
         openai_client,
         batch_size=2,
     )
@@ -518,17 +511,17 @@ def test_openai_strategy_truncate(openai_strategy):
 
 @skip_if_openai_not_available
 def test_openai_strategy_caching():
-    strategy1 = jellyjoin.get_automatic_strategy()
-    strategy2 = jellyjoin.get_automatic_strategy()
+    strategy1 = jj.get_automatic_strategy()
+    strategy2 = jj.get_automatic_strategy()
     assert strategy1 is strategy2
 
 
 def test_get_similarity_function():
-    get_similarity_function = jellyjoin.get_similarity_function
+    get_similarity_function = jj.get_similarity_function
 
     # default
     out = get_similarity_function(None)
-    assert out is jellyjoin.damerau_levenshtein_similarity
+    assert out is jj.damerau_levenshtein_similarity
 
     # Callable passthrough (identity)
     g = lambda a, b: 1.0  # noqa: E731
@@ -536,43 +529,43 @@ def test_get_similarity_function():
     assert out is g
 
     # Exact names map correctly
-    assert get_similarity_function("hamming") is jellyjoin.hamming_similarity
-    assert get_similarity_function("levenshtein") is jellyjoin.levenshtein_similarity
+    assert get_similarity_function("hamming") is jj.hamming_similarity
+    assert get_similarity_function("levenshtein") is jj.levenshtein_similarity
     assert (
         get_similarity_function("damerau_levenshtein")
-        is jellyjoin.damerau_levenshtein_similarity
+        is jj.damerau_levenshtein_similarity
     )
-    assert get_similarity_function("jaro") is jellyjoin.jaro_similarity
-    assert get_similarity_function("jaro_winkler") is jellyjoin.jaro_winkler_similarity
+    assert get_similarity_function("jaro") is jj.jaro_similarity
+    assert get_similarity_function("jaro_winkler") is jj.jaro_winkler_similarity
 
     # Normalization: case, whitespace, hyphen→underscore
-    assert get_similarity_function("  JARO  ") is jellyjoin.jaro_similarity
-    assert get_similarity_function("jaro-winkler") is jellyjoin.jaro_winkler_similarity
-    assert get_similarity_function("LeVeNsHtEiN") is jellyjoin.levenshtein_similarity
+    assert get_similarity_function("  JARO  ") is jj.jaro_similarity
+    assert get_similarity_function("jaro-winkler") is jj.jaro_winkler_similarity
+    assert get_similarity_function("LeVeNsHtEiN") is jj.levenshtein_similarity
 
     # raise for other
     with pytest.raises(KeyError):
-        jellyjoin.get_similarity_function("whatever")
+        jj.get_similarity_function("whatever")
 
 
 def test_get_similarity_strategy():
     # default to automatic strategy
-    output = jellyjoin.get_similarity_strategy()
-    assert isinstance(output, jellyjoin.SimilarityStrategy)
+    output = jj.get_similarity_strategy()
+    assert isinstance(output, jj.SimilarityStrategy)
 
-    output = jellyjoin.get_similarity_strategy(None)
-    assert isinstance(output, jellyjoin.SimilarityStrategy)
+    output = jj.get_similarity_strategy(None)
+    assert isinstance(output, jj.SimilarityStrategy)
 
     # pass through a Strategy subclass
-    strategy = jellyjoin.PairwiseStrategy()
-    output = jellyjoin.get_similarity_strategy(strategy)
+    strategy = jj.PairwiseStrategy()
+    output = jj.get_similarity_strategy(strategy)
     assert output is strategy
 
     # pass through a callable
     def custom_function(x, y):
         return 0.0
 
-    output = jellyjoin.get_similarity_strategy(custom_function)
+    output = jj.get_similarity_strategy(custom_function)
     assert output is custom_function
 
     # delegate to pairwise
@@ -582,33 +575,33 @@ def test_get_similarity_strategy():
         " JaRo-WiNkLeR ",
         "jaro_winkler_similarity",
     ]:
-        output = jellyjoin.get_similarity_strategy(strategy)
-        assert isinstance(output, jellyjoin.PairwiseStrategy)
-        assert output.similarity_function is jellyjoin.jaro_winkler_similarity
+        output = jj.get_similarity_strategy(strategy)
+        assert isinstance(output, jj.PairwiseStrategy)
+        assert output.similarity_function is jj.jaro_winkler_similarity
 
     with pytest.raises(ValueError, match=r"^Strategy name 'whatever' must"):
-        jellyjoin.get_similarity_strategy("whatever")
+        jj.get_similarity_strategy("whatever")
 
     # raise for anything else
     with pytest.raises(TypeError):
-        jellyjoin.get_similarity_strategy(123)
+        jj.get_similarity_strategy(123)
 
 
 @skip_if_openai_not_available
 def test_get_similarity_strategy_openai(left_words, right_words):
     for strategy in ("openai", "OpenAI", " openai "):
-        output = jellyjoin.get_similarity_strategy(strategy)
-        assert isinstance(output, jellyjoin.OpenAIEmbeddingStrategy)
+        output = jj.get_similarity_strategy(strategy)
+        assert isinstance(output, jj.OpenAIEmbeddingStrategy)
 
-    df = jellyjoin.jellyjoin(left_words, right_words, strategy="openai")
+    df = jj.jellyjoin(left_words, right_words, strategy="openai")
     assert isinstance(df, pd.DataFrame)
 
 
 @skip_if_nomic_not_available
 def test_get_similarity_strategy_nomic(left_words, right_words):
     for strategy in ["nomic", "NoMiC", " nomic "]:
-        output = jellyjoin.get_similarity_strategy(strategy)
-        assert isinstance(output, jellyjoin.NomicEmbeddingStrategy)
+        output = jj.get_similarity_strategy(strategy)
+        assert isinstance(output, jj.NomicEmbeddingStrategy)
 
-    df = jellyjoin.jellyjoin(left_words, right_words, strategy="nomic")
+    df = jj.jellyjoin(left_words, right_words, strategy="nomic")
     assert isinstance(df, pd.DataFrame)

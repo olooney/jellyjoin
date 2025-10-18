@@ -240,36 +240,78 @@ def jellyjoin(
     return_similarity_matrix: bool = False,
 ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
     """
-    Join dataframes or lists based on semantic similarity.
+    Join two data sources by computing pairwise semantic similarity.
 
-    Args:
-        left: Left DataFrame or Collection of strings
-        right: Right DataFrame or Collection of strings
-        on: Join column name to use for both left and right dataframes
-        left_on: Column name to use for left dataframe
-        right_on: Column name to use for right dataframe
-        strategy: `jelljoin.Strategy` to use to calculate similarity
-        threshold: Minimum similarity score to consider a match (default: 0.0)
-        allow_many: Find one-to-many assocations
+    This function extends fuzzy or semantic matching to perform a join
+    between two datasets (lists or DataFrames). Similarity between records
+    is computed using the specified strategy, and the results are combined
+    into a joined DataFrame, optionally along with the full similarity matrix.
 
-        left_index_column:
-            name for the column which holds the `.iloc` row index of the row
-            from the left dataframe. Pass `None` to suppress this column in output.
-        right_index_column:
-            name for the column which holds the `.iloc` row index of the row
-            from the right dataframe. Pass `None` to suppress this column in output.
-        similarity_column:
-            name for the column added to the joined dataframe to hold the
-            similarity score. Pass `None` to suppress this column in output.
-        suffixes:
-            column suffixes added on the left and right sides to ensure
-            uniqueness.
-        return_similarity_matrix:
-            pass True to return the pair (dataframe, similarity_matrix)
-            instead of just the dataframe (default)
+    Parameters
+    ----------
+    left : pandas.DataFrame or Collection of str
+        Left input data. Can be a DataFrame or a list/series of strings.
+    right : pandas.DataFrame or Collection of str
+        Right input data. Can be a DataFrame or a list/series of strings.
+    on : str, optional
+        Column name to join on when both left and right are DataFrames.
+        Mutually exclusive with `left_on` and `right_on`.
+    left_on : str, optional
+        Column name in the left DataFrame to use for matching.
+    right_on : str, optional
+        Column name in the right DataFrame to use for matching.
+    strategy : StrategyLike, optional
+        Similarity strategy to use (e.g., `"jaro_winkler"`, `"openai"`,
+        or a `jellyjoin.Strategy` instance). If `None`, an automatic
+        strategy is selected based on availability.
+    threshold : float, default=0.0
+        Minimum similarity score (0.0–1.0) required to consider a pair
+        as a valid match.
+    allow_many : {"neither", "left", "right", "both"}, default="neither"
+        Controls whether multiple matches per row are allowed on each side.
+    how : {"inner", "left", "right", "outer"}, default="inner"
+        Join type determining which rows to include in the final output.
+    left_index_column : str or None, default="Left"
+        Name for the column holding the `.iloc` index of each left record.
+        Pass `None` to suppress this column.
+    right_index_column : str or None, default="Right"
+        Name for the column holding the `.iloc` index of each right record.
+        Pass `None` to suppress this column.
+    similarity_column : str or None, default="Similarity"
+        Name for the column containing similarity scores.
+        Pass `None` to omit this column.
+    suffixes : Collection of str, default=("_left", "_right")
+        Suffixes to append to overlapping column names from the left and
+        right DataFrames to ensure uniqueness.
+    return_similarity_matrix : bool, default=False
+        If True, return a tuple `(DataFrame, ndarray)` where the second
+        element is the full similarity matrix. Otherwise, return only
+        the joined DataFrame.
 
-    Returns:
-        DataFrame with joined data sorted by (Left, Right) indices
+    Returns
+    -------
+    pandas.DataFrame or (pandas.DataFrame, numpy.ndarray)
+        Joined DataFrame, optionally with the similarity matrix when
+        `return_similarity_matrix=True`.
+
+    Raises
+    ------
+    ValueError
+        If invalid or conflicting join arguments are provided.
+    TypeError
+        If argument types are incompatible with expected input formats.
+
+    Examples
+    --------
+    >>> import jellyjoin
+    >>> left = ["cat", "dog", "piano"]
+    >>> right = ["CAT", "Dgo", "Whiskey"]
+    >>> df = jellyjoin.jellyjoin(left, right, strategy="jaro_winkler")
+    >>> df.head()
+         Left  Right  Similarity Left Value Right Value
+    0      0      0    1.000000         cat         CAT
+    1      1      1    0.555556         dog         Dgo
+    2      2      2    0.000000       piano     Whiskey
     """
     _validate_jellyjoin_arguments(
         suffixes,
