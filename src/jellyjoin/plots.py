@@ -1,6 +1,13 @@
+# jellyjoin/plots.py
+from __future__ import annotations
+
+from typing import Iterable, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 __all__ = [
     "plot_similarity_matrix",
@@ -9,105 +16,142 @@ __all__ = [
 
 
 def plot_similarity_matrix(
-    similarity_matrix, figsize=(6, 6), left_labels=None, right_labels=None
-):
-    """
-    Displays a similarity matrix as a heatmap with labels.
-    """
-    # Display the similarity matrix visually
-    fig, ax = plt.subplots(figsize=figsize)
-    im = ax.imshow(similarity_matrix, cmap="Blues")
+    similarity_matrix: np.ndarray,
+    *,
+    ax: Axes | None = None,
+    figsize: Tuple[float, float] | None = None,
+    left_labels: Iterable[str] | None = None,
+    right_labels: Iterable[str] | None = None,
+    cmap: str = "Blues",
+    annotate: bool = True,
+    annotation_fontsize: int = 6,
+    label_fontsize: int = 9,
+    title: str = "Similarity Matrix",
+    show_colorbar: bool = True,
+) -> Tuple[Figure, Axes]:
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
 
-    # Show all ticks and label them with the respective list entries
-    n_rows, n_columns = similarity_matrix.shape
-    ax.set_xticks(np.arange(n_rows))
-    ax.set_yticks(np.arange(n_columns))
-    if right_labels:
-        ax.set_xticklabels(right_labels, rotation=45, ha="right", fontsize=9)
-    if left_labels:
-        ax.set_yticklabels(left_labels, fontsize=9)
+    sim = np.asarray(similarity_matrix)
+    if sim.ndim != 2:
+        raise ValueError("similarity_matrix must be 2D.")
 
-    # Loop over data dimensions and create text annotations
-    score_threshold = np.percentile(similarity_matrix, 90)
-    for i in range(n_rows):
-        for j in range(n_columns):
-            score = similarity_matrix[i, j]
-            text_color = "black" if score < score_threshold else "white"
-            ax.text(
-                j,
-                i,
-                f"{score:.2f}",
-                ha="center",
-                va="center",
-                color=text_color,
-                fontsize=6,
-            )
+    n_rows, n_cols = sim.shape
+    im = ax.imshow(sim, cmap=cmap)
 
-    # Add colorbar, labels, and title
-    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    ax.set_xticks(np.arange(n_cols))
+    ax.set_yticks(np.arange(n_rows))
+
+    if right_labels is not None:
+        ax.set_xticklabels(
+            list(right_labels), rotation=45, ha="right", fontsize=label_fontsize
+        )
+    if left_labels is not None:
+        ax.set_yticklabels(list(left_labels), fontsize=label_fontsize)
+
+    if annotate:
+        thresh = float(np.percentile(sim, 90)) if sim.size else 0.0
+        for i in range(n_rows):
+            for j in range(n_cols):
+                val = sim[i, j]
+                ax.text(
+                    j,
+                    i,
+                    f"{val:.2f}",
+                    ha="center",
+                    va="center",
+                    color=("black" if val < thresh else "white"),
+                    fontsize=annotation_fontsize,
+                )
+
+    if show_colorbar:
+        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
     ax.set_xlabel("Right")
     ax.set_ylabel("Left")
-    ax.set_title("Similarity Matrix")
-    plt.tight_layout()
+    ax.set_title(title)
+    fig.tight_layout()
 
-    return fig
+    return fig, ax
 
 
 def plot_associations(
     association_df: pd.DataFrame,
-    figsize=(10, 6),
-    indent=0.2,
-    text_gap=0.02,
-    left_column="Left Value",
-    right_column="Right Value",
-):
-    """
-    Displays a "connect-the-dots" style plot showing labeled dots
-    on the left and right connected by lines.
-    """
-    # Extract left and right labels and indices
-    left_labels = association_df[left_column]
-    right_labels = association_df[right_column]
-    left_indices = association_df["Left"]
-    right_indices = association_df["Right"]
+    *,
+    ax: Axes | None = None,
+    figsize: Tuple[float, float] | None = None,
+    indent: float = 0.2,
+    text_gap: float = 0.02,
+    left_column: str = "Left Value",
+    right_column: str = "Right Value",
+    left_index_column: str = "Left",
+    right_index_column: str = "Right",
+    marker_color: str = "black",
+    line_color: str = "gray",
+    line_width: float = 0.8,
+    label_fontsize: int = 10,
+    title: str | None = None,
+) -> Tuple[Figure, Axes]:
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
 
-    # Set up plot
-    fig, ax = plt.subplots(figsize=figsize)
+    required = {left_column, right_column, left_index_column, right_index_column}
+    missing = required - set(association_df.columns)
+    if missing:
+        raise ValueError(
+            f"association_df is missing required columns: {sorted(missing)}"
+        )
+
+    left_labels = association_df[left_column].tolist()
+    right_labels = association_df[right_column].tolist()
+    left_indices = association_df[left_index_column].tolist()
+    right_indices = association_df[right_index_column].tolist()
+
     ax.set_xlim(0, 1)
-    ax.axis("off")  # No axes or labels
+    ax.set_ylim(0, max(len(left_labels), len(right_labels)) + 1)
+    ax.axis("off")
 
-    # Plot left dots and labels
-    for i, (label, idx) in enumerate(zip(left_labels, left_indices)):
-        ax.plot(indent, len(left_labels) - idx, "o", color="black")
+    for label, idx in zip(left_labels, left_indices):
+        y = len(left_labels) - idx
+        ax.plot(indent, y, "o", color=marker_color)
         ax.text(
             indent - text_gap,
-            len(left_labels) - idx,
-            label,
+            y,
+            str(label),
             ha="right",
             va="center",
-            fontsize=10,
+            fontsize=label_fontsize,
         )
 
-    # Plot right dots and labels
-    for i, (label, idx) in enumerate(zip(right_labels, right_indices)):
-        ax.plot(1 - indent, len(right_labels) - idx, "o", color="black")
+    for label, idx in zip(right_labels, right_indices):
+        y = len(right_labels) - idx
+        ax.plot(1 - indent, y, "o", color=marker_color)
         ax.text(
             1 - indent + text_gap,
-            len(right_labels) - idx,
-            label,
+            y,
+            str(label),
             ha="left",
             va="center",
-            fontsize=10,
+            fontsize=label_fontsize,
         )
 
-    # Draw lines connecting matches
-    for left_idx, right_idx in zip(left_indices, right_indices):
+    for li, ri in zip(left_indices, right_indices):
+        y_left = len(left_labels) - li
+        y_right = len(right_labels) - ri
         ax.plot(
             [indent, 1 - indent],
-            [len(left_labels) - left_idx, len(right_labels) - right_idx],
-            color="gray",
-            lw=0.8,
+            [y_left, y_right],
+            color=line_color,
+            lw=line_width,
             zorder=0,
         )
 
-    return fig
+    if title:
+        ax.set_title(title)
+    fig.tight_layout()
+
+    return fig, ax
