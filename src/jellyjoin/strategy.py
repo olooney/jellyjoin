@@ -369,8 +369,8 @@ def get_automatic_strategy() -> SimilarityStrategy:
         _cached_strategy = strategy
         logger.debug("Instantiated and cached OpenAIEmbeddingStrategy.")
         return strategy
-    except Exception:
+    except Exception:  # pragma: no cover
         logger.warning("OpenAI unavailable; trying next strategy...")
         logging.debug("Failed to instantiate OpenAI client.", exc_info=True)
 
-    return PairwiseStrategy()
+    return PairwiseStrategy()  # pragma: no cover

@@ -2,7 +2,7 @@
 - [ ] README Algorithm  and Diagrams
 - [ ] Review README against recent API changes
 - [ ] allow custom Mahalanobis distances with PSD matrix
-- [ ] shorten `association_column_names`
+- [X] shorten `association_column_names`
 - [X] Literals for similaritylike and strategylike
 - [X] Rename ABC to SimilarityStrategy
 - [X] Return similarity matrix along with dataframe?
@@ -22,6 +22,7 @@ Backlog
 - [ ] biclustering approach?
 - [ ] support polars?
 - [ ] CLI tool
+- [ ] Code coverage report not working in Github Actions?
 
 Done
 ----

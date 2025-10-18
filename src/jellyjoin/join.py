@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 # internal type only used by private functions
 AssignmentList = List[Tuple[int, int, float]]
 
+# these column names are used for in the middle association dataframe are long
+# to reduce the probability of conflicting with user column names.
+LEFT_COLUMN = "Left Jellyjoin Index"
+RIGHT_COLUMN = "Right Jellyjoin Index"
+SIMILARITY_COLUMN = "Jellyjoin Similarity Score"
+
 
 def _find_extra_assignments(
     similarity_matrix: np.ndarray,
@@ -152,31 +158,74 @@ def _coerce_to_dataframes(
 
 def _validate_jellyjoin_arguments(
     suffixes: Collection,
-    association_column_names: Collection,
+    left_index_column: str | None,
+    right_index_column: str | None,
+    similarity_column: str | None,
     allow_many: AllowManyLiteral,
     how: HowLiteral,
 ):
     """
     Raises exception for any invalid arguments.
     """
+    # suffixes added for disambiguation
     if len(suffixes) != 2:
         raise ValueError("Pass exactly two suffixes.")
 
-    if len(association_column_names) != 3:
-        raise ValueError(
-            "Pass exactly three association_column_names: left index, right index, and similarity score."
-        )
+    for index, suffix in enumerate(suffixes):
+        if not isinstance(suffix, str):
+            raise TypeError(f"suffixes[{index}] must be a string.")
+        if not suffix:
+            raise TypeError(f"suffixes[{index}] cannot be an empty string.")
+    if suffixes[0] == suffixes[1]:
+        raise ValueError("suffixes cannot be the same.")
 
+    # similarity column name
+    if similarity_column is not None:
+        if not isinstance(similarity_column, str):
+            raise TypeError("similarity_column must be a string.")
+        if not similarity_column:
+            raise ValueError("similarity_column cannot be an empty string.")
+
+    # allow many values
     if allow_many not in get_args(AllowManyLiteral):
         raise ValueError('allow_many must be "left", "right", "both", or "neither".')
 
+    # allow many values
     if how not in get_args(HowLiteral):
         raise ValueError('how argument must be "inner", "left", "right", or "outer".')
+
+
+def _prepare_middle_columns(
+    left_index_column: str,
+    right_index_column: str,
+    similarity_column: str,
+) -> Tuple[List[str], List[str]]:
+    """
+    Figures out the permanent or temporary names to use for the middle column,
+    and which temporary columns to drop afterwarsd
+    """
+    middle_columns = [
+        left_index_column or LEFT_COLUMN,
+        right_index_column or RIGHT_COLUMN,
+        similarity_column or SIMILARITY_COLUMN,
+    ]
+
+    # if the user supplied column names are None, the column is temporary
+    # and will be dropped from the result dataframe.
+    drop_columns = [
+        LEFT_COLUMN if not left_index_column else None,
+        RIGHT_COLUMN if not right_index_column else None,
+        SIMILARITY_COLUMN if not similarity_column else None,
+    ]
+    drop_columns = [column for column in drop_columns if column]
+
+    return middle_columns, drop_columns
 
 
 def jellyjoin(
     left: pd.DataFrame | Collection,
     right: pd.DataFrame | Collection,
+    *,
     on: str | None = None,
     left_on: str | None = None,
     right_on: str | None = None,
@@ -184,7 +233,9 @@ def jellyjoin(
     threshold: float = 0.0,
     allow_many: AllowManyLiteral = "neither",
     how: HowLiteral = "inner",
-    association_column_names: Tuple[str, str, str] = ("Left", "Right", "Similarity"),
+    left_index_column: str | None = "Left",
+    right_index_column: str | None = "Right",
+    similarity_column: str | None = "Similarity",
     suffixes: Collection = ("_left", "_right"),
     return_similarity_matrix: bool = False,
 ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
@@ -200,8 +251,16 @@ def jellyjoin(
         strategy: `jelljoin.Strategy` to use to calculate similarity
         threshold: Minimum similarity score to consider a match (default: 0.0)
         allow_many: Find one-to-many assocations
-        association_column_names:
-            names for the three columns jellyjoins adds to the dataframe.
+
+        left_index_column:
+            name for the column which holds the `.iloc` row index of the row
+            from the left dataframe. Pass `None` to suppress this column in output.
+        right_index_column:
+            name for the column which holds the `.iloc` row index of the row
+            from the right dataframe. Pass `None` to suppress this column in output.
+        similarity_column:
+            name for the column added to the joined dataframe to hold the
+            similarity score. Pass `None` to suppress this column in output.
         suffixes:
             column suffixes added on the left and right sides to ensure
             uniqueness.
@@ -212,7 +271,14 @@ def jellyjoin(
     Returns:
         DataFrame with joined data sorted by (Left, Right) indices
     """
-    _validate_jellyjoin_arguments(suffixes, association_column_names, allow_many, how)
+    _validate_jellyjoin_arguments(
+        suffixes,
+        left_index_column,
+        right_index_column,
+        similarity_column,
+        allow_many,
+        how,
+    )
 
     # resolve StrategyLike to specific Strategy instance
     strategy = get_similarity_strategy(strategy)
@@ -239,13 +305,20 @@ def jellyjoin(
         )
         assignments.extend(extra_assignments)
 
+    middle_columns, drop_columns = _prepare_middle_columns(
+        left_index_column, right_index_column, similarity_column
+    )
+
     # join left to right with the assignments in the middle
-    middle = pd.DataFrame(assignments, columns=association_column_names)
+    middle = pd.DataFrame(assignments, columns=middle_columns)
     result = _triple_join(left, middle, right, how, suffixes)
 
     # Sort and reset index
-    result = result.sort_values(by=list(association_column_names))
-    result = result.reset_index(drop=True)
+    result = result.sort_values(by=list(middle_columns)).reset_index(drop=True)
+
+    # drop any temporary columns the user didn't ask for.
+    if drop_columns:
+        result = result.drop(columns=drop_columns)
 
     if return_similarity_matrix:
         return result, similarity_matrix

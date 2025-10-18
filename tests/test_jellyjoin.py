@@ -10,10 +10,6 @@ import pytest
 
 import jellyjoin
 
-# -----------------------
-# Fixtures
-# -----------------------
-
 dotenv.load_dotenv()
 
 # not a fixture; used for parameterize
@@ -47,17 +43,22 @@ def skip_if_nomic_not_available(test_func):
     return wrapper
 
 
-@pytest.fixture()
+# -----------------------
+# Fixtures
+# -----------------------
+
+
+@pytest.fixture
 def left_words():
     return ["Cat", "Dog", "Piano"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def right_words():
     return ["CAT", "Dgo", "Whiskey"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def left_sections():
     return [
         "Introduction",
@@ -68,7 +69,7 @@ def left_sections():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def right_sections():
     return [
         "Abstract",
@@ -79,7 +80,7 @@ def right_sections():
     ]
 
 
-@pytest.fixture()
+@pytest.fixture
 def left_df():
     df = pd.DataFrame(
         {
@@ -99,7 +100,7 @@ def left_df():
     return df
 
 
-@pytest.fixture()
+@pytest.fixture
 def right_df():
     return pd.DataFrame(
         {
@@ -311,6 +312,57 @@ def test_nomic_empty(left, right):
     assert matrix.shape == (len(left), len(right))
 
 
+def test_jellyjoin_validation():
+    with pytest.raises(ValueError, match=r"Pass exactly two suffixes\."):
+        jellyjoin.jellyjoin([], [], suffixes=("only_one",))
+
+    with pytest.raises(ValueError, match=r"Pass exactly two suffixes\."):
+        jellyjoin.jellyjoin([], [], suffixes=("_left", "_right", "_extra"))
+
+    with pytest.raises(ValueError, match=r"suffixes cannot be the same\."):
+        jellyjoin.jellyjoin([], [], suffixes=("_left_foot", "_left_foot"))
+
+    with pytest.raises(TypeError, match=r"suffixes\[0\] must be a string\."):
+        jellyjoin.jellyjoin([], [], suffixes=(None, "_right"))
+
+    with pytest.raises(TypeError, match=r"suffixes\[1\] must be a string\."):
+        jellyjoin.jellyjoin([], [], suffixes=("_left", 5))
+
+    with pytest.raises(TypeError, match=r"suffixes\[0\] cannot be an empty string\."):
+        jellyjoin.jellyjoin([], [], suffixes=("", "_right"))
+
+    with pytest.raises(TypeError, match=r"suffixes\[1\] cannot be an empty string\."):
+        jellyjoin.jellyjoin([], [], suffixes=("_left", ""))
+
+    with pytest.raises(TypeError, match=r"similarity_column must be a string\."):
+        jellyjoin.jellyjoin([], [], similarity_column=123)
+
+    with pytest.raises(
+        ValueError, match=r"similarity_column cannot be an empty string\."
+    ):
+        jellyjoin.jellyjoin([], [], similarity_column="")
+
+    with pytest.raises(
+        ValueError, match=r'allow_many must be "left", "right", "both", or "neither"\.'
+    ):
+        jellyjoin.jellyjoin([], [], allow_many="some")
+
+    with pytest.raises(
+        ValueError, match=r'how argument must be "inner", "left", "right", or "outer"\.'
+    ):
+        jellyjoin.jellyjoin([], [], how="joiny")
+
+    with pytest.raises(
+        ValueError, match=r'Pass only "on" or "left_on" and "right_on", not both\.'
+    ):
+        jellyjoin.jellyjoin([], [], on="id", left_on="client_no")
+
+    with pytest.raises(
+        ValueError, match=r'Pass only "on" or "left_on" and "right_on", not both\.'
+    ):
+        jellyjoin.jellyjoin([], [], on="id", right_on="client_no")
+
+
 def test_jellyjoin_options():
     left = pd.DataFrame(
         {
@@ -335,14 +387,15 @@ def test_jellyjoin_options():
         threshold=0.01,
         allow_many="left",
         how="outer",
-        association_column_names=("left_index", "right_index", "score"),
+        left_index_column="left_index",
+        right_index_column=None,
+        similarity_column="score",
         suffixes=("_2024", "_2025"),
     )
 
     expected = pd.DataFrame(
         {
             "left_index": [0, 1, 2],
-            "right_index": [0, 1, 2],
             "score": [0.822222, 0.911111, 0.8],
             "id_2024": [1, 2, 3],
             "name_2024": ["aaa", "bbb", "ccc"],
@@ -364,6 +417,17 @@ def test_jellyjoin_options():
         atol=1e-6,
         rtol=1e-6,
     )
+
+
+def test_jellyjoin_drop_columns():
+    df = jellyjoin.jellyjoin(
+        ["x", "y"],
+        ["y", "x"],
+        left_index_column=None,
+        right_index_column=None,
+        similarity_column=None,
+    )
+    assert df.columns.tolist() == ["Left Value", "Right Value"]
 
 
 def test_jellyjoin_with_lists(left_sections, right_sections):
@@ -409,7 +473,7 @@ def test_jellyjoin_allow_many(left_df, right_df, allow_many):
         right_df,
         left_on="API Path",
         right_on="UI Field Name",
-        threshold=0.6,
+        threshold=0.4,
         allow_many=allow_many,
     )
     assert isinstance(df, pd.DataFrame)
