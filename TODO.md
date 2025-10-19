@@ -1,9 +1,27 @@
+- [ ] use uv to walk back to older package versions
+- [ ] automatic nomic (check filesystem)
+- [ ] unwind wildcards
+- [ ] Jelly class
+- [ ] rename core.py
 - [ ] README custom similarity strategy
 - [ ] README Algorithm and Diagrams
-- [ ] use uv to walk back to older package versions
 - [ ] beta release
 
-- [ ] Jelly class
+Backlog
+-------
+
+- [ ] Better support for indexed dataframes?
+- [ ] allow custom Mahalanobis distances with PSD matrix
+- [ ] join option for blocking?
+- [ ] Dedupe / clustering?
+- [ ] biclustering approach?
+- [ ] support polars?
+- [ ] CLI tool
+
+Done
+----
+
+- [X] Code coverage report not working in Github Actions?
 - [X] Review README against recent API changes
 - [X] jellyjoin() docstring
 - [X] shorten `association_column_names`
@@ -15,20 +33,6 @@
     - [X] Ollama embedding models
 - [X] 100% code coverage?
 - [X] unit tests for plots?
-
-Backlog
--------
-
-- [ ] allow custom Mahalanobis distances with PSD matrix
-- [ ] join option for blocking?
-- [ ] Dedupe / clustering?
-- [ ] biclustering approach?
-- [ ] support polars?
-- [ ] CLI tool
-- [ ] Code coverage report not working in Github Actions?
-
-Done
-----
 
 - [X] support named strategies
 - [X] enforce / validate types
