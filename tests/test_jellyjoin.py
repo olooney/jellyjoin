@@ -237,7 +237,6 @@ def test_nomic_strategy_config(left_words, right_words):
         task_type="search_query",
         dimensionality=100,
         device="gpu",
-        allow_download=True,
         dtype=np.float64,
     )
     matrix = nomic_strategy(left_words, right_words)
@@ -246,7 +245,7 @@ def test_nomic_strategy_config(left_words, right_words):
 
 
 def test_triple_join():
-    from jellyjoin.join import _triple_join
+    from jellyjoin._join import _triple_join
 
     left = pd.DataFrame(
         {"x": [1, 2, 3], "name": ["aa", "bb", "cc"], "Left": [True] * 3}
@@ -428,14 +427,34 @@ def test_jellyjoin_validation():
         jj.jellyjoin([], [], how="joiny")
 
     with pytest.raises(
-        ValueError, match=r'Pass only "on" or "left_on" and "right_on", not both\.'
+        ValueError,
+        match=r"If the `on` argument is passed, `left_on` and `right_on` must not be passed\.",
     ):
         jj.jellyjoin([], [], on="id", left_on="client_no")
 
     with pytest.raises(
-        ValueError, match=r'Pass only "on" or "left_on" and "right_on", not both\.'
+        ValueError,
+        match=r"If the `on` argument is passed, `left_on` and `right_on` must not be passed\.",
     ):
         jj.jellyjoin([], [], on="id", right_on="client_no")
+
+    with pytest.raises(
+        TypeError,
+        match=r"Arguments `on`, `left_on`, and `right_on` must be strings if supplied\.",
+    ):
+        jj.jellyjoin([], [], on=42)
+
+    with pytest.raises(
+        TypeError,
+        match=r"Arguments `on`, `left_on`, and `right_on` must be strings if supplied\.",
+    ):
+        jj.jellyjoin([], [], left_on=42)
+
+    with pytest.raises(
+        TypeError,
+        match=r"Arguments `on`, `left_on`, and `right_on` must be strings if supplied\.",
+    ):
+        jj.jellyjoin([], [], right_on=42)
 
 
 def test_jellyjoin_options():
@@ -697,3 +716,58 @@ def test_get_similarity_strategy_ollama(left_words, right_words):
 
     df = jj.jellyjoin(left_words, right_words, strategy="ollama")
     assert isinstance(df, pd.DataFrame)
+
+
+def test_jelly_class(left_words, right_words):
+    # remember options
+    with pytest.raises(ValueError):
+        jj.Jelly(suffixes=("_only",))
+
+    with pytest.raises(ValueError):
+        jj.Jelly(how="not-a-valid-how")
+
+    jelly = jj.Jelly(
+        strategy="jaro",
+        threshold=0.4,
+        allow_many="both",
+        how="left",
+        similarity_column="Score",
+        suffixes=("_x", "_y"),
+        return_similarity_matrix=True,
+    )
+    df1, mat1 = jelly.join(left_words, right_words)
+
+    assert isinstance(df1, pd.DataFrame)
+    assert "Score" in df1.columns
+    assert df1["Score"].between(0.0, 1.0).all()
+
+    assert isinstance(mat1, np.ndarray)
+    assert mat1.shape == (len(left_words), len(right_words))
+
+    # overrides
+    df2 = jelly.join(
+        left_words,
+        right_words,
+        similarity_column="Sim",
+        return_similarity_matrix=False,
+        threshold=0.9999,
+        how="inner",
+    )
+
+    assert isinstance(df2, pd.DataFrame)
+    assert len(df2) == 0  # threshold is too high for match
+    assert "Sim" in df2.columns
+    assert "Score" not in df2.columns
+
+    # column names
+    left_df = pd.DataFrame({"name": ["alpha", "beta"], "v": [1, 2]})
+    right_df = pd.DataFrame({"name": ["alpha", "gamma"], "v": [10, 30]})
+
+    jelly = jj.Jelly(on="name", similarity_column="S", suffixes=("1", "2"))
+    df3 = jelly.join(left_df, right_df, strategy="jaro")
+
+    assert isinstance(df3, pd.DataFrame)
+    assert "S" in df3.columns
+    assert "v1" in df3.columns
+    assert "v2" in df3.columns
+    assert len(df3) >= 1

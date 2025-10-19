@@ -1,8 +1,9 @@
 - [ ] use uv to walk back to older package versions
-- [ ] automatic nomic (check filesystem)
-- [ ] unwind wildcards
-- [ ] Jelly class
-- [ ] rename core.py
+- [X] automatic nomic (check filesystem)
+- [X] automatic ollama (test connection)
+- [X] unwind wildcards
+- [X] Jelly class
+- [X] rename core.py
 - [ ] README custom similarity strategy
 - [ ] README Algorithm and Diagrams
 - [ ] beta release

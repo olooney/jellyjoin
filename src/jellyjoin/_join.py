@@ -5,6 +5,7 @@ from typing import Iterable, List, Tuple, get_args
 import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
+from typing_extensions import TypedDict, Unpack  # needed to support python 3.10
 
 from .strategy import get_similarity_strategy
 from .typing import (
@@ -15,6 +16,7 @@ from .typing import (
 
 __all__ = [
     "jellyjoin",
+    "Jelly",
 ]
 
 logger = logging.getLogger(__name__)
@@ -130,13 +132,6 @@ def _coerce_to_dataframes(
     left_on: str | None,
     right_on: str | None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, str, str]:
-    # handle the shared "on" column name
-    if on:
-        if left_on or right_on:
-            raise ValueError('Pass only "on" or "left_on" and "right_on", not both.')
-        left_on = on
-        right_on = on
-
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
         left = pd.DataFrame({left_on or "Left Value": list(left)})
@@ -144,7 +139,14 @@ def _coerce_to_dataframes(
     if not isinstance(right, pd.DataFrame):
         right = pd.DataFrame({right_on or "Right Value": list(right)})
 
-    # TODO: magic case where the two dataframes share exactly one column name?
+    # handle the shared "on" column name
+    if on:
+        if left_on or right_on:
+            raise ValueError(
+                "If the `on` argument is passed, `left_on` and `right_on` must not be passed."
+            )
+        left_on = on
+        right_on = on
 
     # default to joining on the first column if not explicitly named
     if not left_on:
@@ -152,6 +154,11 @@ def _coerce_to_dataframes(
 
     if not right_on:
         right_on = right.columns[0]
+
+    if not isinstance(left_on, str) or not isinstance(right_on, str):
+        raise TypeError(
+            "Arguments `on`, `left_on`, and `right_on` must be strings if supplied."
+        )
 
     return left, right, left_on, right_on
 
@@ -366,3 +373,156 @@ def jellyjoin(
         return result, similarity_matrix
     else:
         return result
+
+
+class JellyJoinKwargs(TypedDict, total=False):
+    on: str | None
+    left_on: str | None
+    right_on: str | None
+    strategy: StrategyLike | None
+    threshold: float | None
+    allow_many: AllowManyLiteral | None
+    how: HowLiteral | None
+    left_index_column: str | None
+    right_index_column: str | None
+    similarity_column: str | None
+    suffixes: Collection | None
+    return_similarity_matrix: bool | None
+
+
+class Jelly:
+    def __init__(
+        self,
+        *,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        strategy: StrategyLike | None = None,
+        threshold: float = 0.0,
+        allow_many: AllowManyLiteral = "neither",
+        how: HowLiteral = "inner",
+        left_index_column: str | None = "Left",
+        right_index_column: str | None = "Right",
+        similarity_column: str | None = "Similarity",
+        suffixes: Collection = ("_left", "_right"),
+        return_similarity_matrix: bool = False,
+    ) -> None:
+        """
+        Create a curried Jelly joiner with default options.
+
+        Parameters
+        ----------
+        on : str, optional
+            Column name to join on when both inputs are DataFrames.
+        left_on : str, optional
+            Column name in the left DataFrame to use for matching.
+        right_on : str, optional
+            Column name in the right DataFrame to use for matching.
+        strategy : StrategyLike, optional
+            Similarity strategy to use (e.g., "jaro_winkler", "openai", or a Strategy instance).
+        threshold : float, default=0.0
+            Minimum similarity score (0.0–1.0) required to consider a pair a valid match.
+        allow_many : {"neither", "left", "right", "both"}, default="neither"
+            Controls whether multiple matches per row are allowed on each side.
+        how : {"inner", "left", "right", "outer"}, default="inner"
+            Join type determining which rows to include in the final output.
+        left_index_column : str or None, default="Left"
+            Name for the column holding the `.iloc` index of each left record.
+        right_index_column : str or None, default="Right"
+            Name for the column holding the `.iloc` index of each right record.
+        similarity_column : str or None, default="Similarity"
+            Name for the column containing similarity scores.
+        suffixes : Collection of str, default=("_left", "_right")
+            Suffixes appended to overlapping column names from left/right DataFrames.
+        return_similarity_matrix : bool, default=False
+            If True, `join()` returns `(DataFrame, ndarray)`; otherwise just the DataFrame.
+        """
+        _validate_jellyjoin_arguments(
+            suffixes,
+            left_index_column,
+            right_index_column,
+            similarity_column,
+            allow_many,
+            how,
+        )
+        return_similarity_matrix = bool(return_similarity_matrix)
+
+        self.options = {
+            "left_on": left_on,
+            "right_on": right_on,
+            "strategy": strategy,
+            "threshold": threshold,
+            "allow_many": allow_many,
+            "how": how,
+            "left_index_column": left_index_column,
+            "right_index_column": right_index_column,
+            "similarity_column": similarity_column,
+            "suffixes": suffixes,
+            "return_similarity_matrix": return_similarity_matrix,
+        }
+
+    def join(
+        self,
+        left: pd.DataFrame | Collection,
+        right: pd.DataFrame | Collection,
+        **kwargs: Unpack[JellyJoinKwargs],
+    ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
+        """
+        Join two data sources by computing pairwise semantic similarity,
+        using the defaults set on the `Jelly` instance unless overridden.
+
+        Parameters
+        ----------
+        left : pandas.DataFrame or Collection of str
+            Left input data. Can be a DataFrame or a list/series of strings.
+        right : pandas.DataFrame or Collection of str
+            Right input data. Can be a DataFrame or a list/series of strings.
+        on : str, optional
+            Column name to join on when both left and right are DataFrames.
+            Mutually exclusive with `left_on` and `right_on`.
+        left_on : str, optional
+            Column name in the left DataFrame to use for matching.
+        right_on : str, optional
+            Column name in the right DataFrame to use for matching.
+        strategy : StrategyLike, optional
+            Similarity strategy to use (e.g., "jaro_winkler", "openai",
+            or a Strategy instance).
+        threshold : float, optional
+            Minimum similarity score (0.0–1.0) required to consider a pair as a valid match.
+        allow_many : {"neither", "left", "right", "both"}, optional
+            Controls whether multiple matches per row are allowed on each side.
+        how : {"inner", "left", "right", "outer"}, optional
+            Join type determining which rows to include in the final output.
+        left_index_column : str or None, optional
+            Name for the column holding the `.iloc` index of each left record.
+            Pass `None` to suppress this column.
+        right_index_column : str or None, optional
+            Name for the column holding the `.iloc` index of each right record.
+            Pass `None` to suppress this column.
+        similarity_column : str or None, optional
+            Name for the column containing similarity scores. Pass `None` to omit.
+        suffixes : Collection of str, optional
+            Suffixes to append to overlapping column names from the left and right DataFrames.
+        return_similarity_matrix : bool, optional
+            If True, return `(DataFrame, ndarray)`; otherwise, only the joined DataFrame.
+
+        Returns
+        -------
+        pandas.DataFrame or (pandas.DataFrame, numpy.ndarray)
+            Joined DataFrame, optionally with the similarity matrix.
+
+        Raises
+        ------
+        ValueError
+            If invalid or conflicting join arguments are provided.
+        TypeError
+            If argument types are incompatible with expected input formats.
+        """
+        arguments = {
+            "left": left,
+            "right": right,
+            **self.options,
+            **kwargs,
+        }
+
+        return jellyjoin(**arguments)

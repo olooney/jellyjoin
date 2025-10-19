@@ -1,9 +1,9 @@
 import logging
 from collections.abc import Collection
+from pathlib import Path
 from typing import List, Literal
 
 import numpy as np
-import tiktoken
 from numpy.linalg import norm
 from numpy.typing import ArrayLike, DTypeLike
 
@@ -27,6 +27,8 @@ __all__ = [
     "get_similarity_strategy",
     "get_automatic_strategy",
 ]
+
+NOMIC_V15_CACHE = Path("~/.cache/gpt4all/nomic-embed-text-v1.5.f16.gguf").expanduser()
 
 
 logger = logging.getLogger(__name__)
@@ -127,8 +129,9 @@ class OpenAIEmbeddingStrategy(EmbeddingStrategy):
         dtype:
             Data type of the returned embedding arrays. Defaults to `np.float32`.
         """
+        import tiktoken
+
         if client is None:
-            # deferred import of optional dependency
             import openai
 
             self.client = openai.OpenAI()
@@ -219,11 +222,11 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         task_type: TaskTypeLiteral = "search_document",
         dimensionality: int | None = None,
         device: Literal["cpu", "gpu"] | None = None,
-        allow_download: bool = True,
         dtype: DTypeLike = np.float32,
     ):
         """
-        Local Nomic embeddings (no network calls after first model download).
+        Local Nomic embeddings. Requires `nomic` package. Nomic will download and
+        cache model weights the first time a new embedding model is used.
 
         Parameters
         ----------
@@ -237,9 +240,6 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
             Output embedding size (v1.5 supports 64..768). None = model default.
         device:
             Device for local mode (e.g., 'gpu'). `None` for automatic.
-        allow_download:
-            True if nomic should download and cache the model automatically if
-            it's not available locally.
         dtype:
             Data type of the returned embedding arrays. Defaults to `np.float32`.
         """
@@ -257,7 +257,6 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         self.task_type = task_type
         self.dimensionality = dimensionality
         self.device = device
-        self.allow_download = bool(allow_download)
         self.dtype = dtype
 
         super().__init__(preprocessor=preprocessor)
@@ -278,7 +277,6 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
             long_text_mode="truncate",
             device=self.device,
             dimensionality=self.dimensionality,
-            allow_download=self.allow_download,
         )
 
         return np.array(result["embeddings"], dtype=self.dtype)
@@ -405,10 +403,14 @@ def get_similarity_strategy(
     """
     Resolves a strategy identifier to a strategy class.
 
-    - "openai" or "nomic" will instantiate those strategies with default arguments.
-    - any other string will be passed to `PairwiseStrategy` which will
+    - Any object which is already a subclass of SimilarityStrategy will
+      simple be returned as-is.
+    - Any function or callable object will be interpreted as a StrategyCallable and
+      returned as-is.
+    - Passing the string "openai", "nomic", or "ollama" will instantiate those
+      strategies with default arguments.
+    - Any other string will be passed to `PairwiseStrategy` which will
       interpret it as the name of a similarity function, e.g. 'jaro-winkler'
-    - Any callable will be interpreted as a StrategyCallable and returned as-is.
     - `None` will call `get_automatic_strategy()`.
     """
     match strategy:
@@ -448,25 +450,68 @@ def get_similarity_strategy(
             )
 
 
-def get_automatic_strategy() -> SimilarityStrategy:
+def get_automatic_strategy() -> SimilarityStrategy:  # pragma: no cover
     """
     Tries to instantiate an similarity Strategy in this order:
+
         1. `OpenAIEmbeddingStrategy`
-        2.`PairwiseStrategy`
+            This requires the "ollama" and "tiktoken" packages  to be installed
+            and the OPENAPI_API_KEY environment variable to be set.
+        2. `NomicEmbeddingStrategy`
+            This requires the "nomic" package to be installed and that the
+            "nomic-embed-text-v1.5" model to already be download and cached.
+        3. `OllamaEmbeddingStrategy`
+           This requires the "ollama" package to be installed. It will make
+           a test request to the server to ensure it is running and reachable.
+        4.`PairwiseStrategy`
+            Uses a weak string similarity model.
     """
     global _cached_strategy
 
     if _cached_strategy:
-        logger.debug("Using cached jellyjoin.Strategy.")
+        logger.warning("Using cached jellyjoin.Strategy.")
         return _cached_strategy
 
+    # OpenAI
     try:
         strategy = OpenAIEmbeddingStrategy()
         _cached_strategy = strategy
-        logger.debug("Instantiated and cached OpenAIEmbeddingStrategy.")
+        logger.warning("Instantiated and cached OpenAIEmbeddingStrategy.")
         return strategy
-    except Exception:  # pragma: no cover
+    except Exception:
         logger.warning("OpenAI unavailable; trying next strategy...")
-        logging.debug("Failed to instantiate OpenAI client.", exc_info=True)
+        logger.debug("Failed to instantiate OpenAI client.", exc_info=True)
 
-    return PairwiseStrategy()  # pragma: no cover
+    # Nomic
+    try:
+        # this is necessary because nomic's `allow_download` option is broken
+        # and will simply cause an error if set to False.
+        if NOMIC_V15_CACHE.exists():
+            strategy = NomicEmbeddingStrategy()
+            _cached_strategy = strategy
+            logger.warning("Instantiated and cached NomicEmbeddingStrategy.")
+            return strategy
+        else:
+            logger.warning(
+                f"Cached Nomic weights {str(NOMIC_V15_CACHE)!r} not found; trying next strategy..."
+            )
+    except Exception:  # pragma: no cover
+        logger.warning("Nomic unavailable; trying next strategy...")
+        logger.debug("Failed to instantiate Nomic client.", exc_info=True)
+
+    # Ollama
+    try:
+        strategy = OllamaEmbeddingStrategy()
+        strategy.embed("testing ollama server availability")
+        _cached_strategy = strategy
+        logger.warning("Instantiated and cached OllamaEmbeddingStrategy.")
+        return strategy
+    except Exception:
+        logger.warning("Ollama unavailable; trying next strategy...")
+        logger.debug("Failed to instantiate OpenAI client.", exc_info=True)
+
+    # Pairwise (default)
+    logger.warning(
+        "No automatic embedding model detected, defaulting to PairwiseStrategy."
+    )
+    return PairwiseStrategy()
