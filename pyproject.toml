@@ -23,10 +23,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-    "jellyfish>=1.2.0",
-    "numpy>=1.26.4",
-    "pandas>=2.2.2",
-    "scipy>=1.13.0",
+    "jellyfish>=1.1.0",
+    "numpy>=1.24.4",
+    "pandas>=2.1.2",
+    "scipy>=1.10.0",
     "typing_extensions>=4.12.2",
 ]
 
@@ -36,7 +36,7 @@ dev = [
     "matplotlib>=3.8.4",
     "openai>=1.61.1",
     "tiktoken>=0.7.0",
-    "nomic>=3.6.0",
+    "nomic[local]>=3.6.0",
     "ollama>=0.1.9",
     "pre-commit",
     "pytest",
@@ -54,10 +54,10 @@ test = [
 ]
 
 extra = [
-    "matplotlib>=3.8.4",
+    "matplotlib>=3.5.3",
     "openai>=1.61.1",
     "tiktoken>=0.7.0",
-    "nomic>=3.6.0",
+    "nomic[local]>=3.6.0",
     "ollama>=0.1.9",
 ]
 

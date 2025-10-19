@@ -1,4 +1,4 @@
-- [ ] use uv to walk back to older package versions
+- [X] use uv to walk back to older package versions
 - [X] automatic nomic (check filesystem)
 - [X] automatic ollama (test connection)
 - [X] unwind wildcards
