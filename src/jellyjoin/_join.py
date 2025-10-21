@@ -5,7 +5,6 @@ from typing import Iterable, List, Tuple, get_args
 import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
-from typing_extensions import TypedDict, Unpack  # needed to support python 3.10
 
 from .strategy import get_similarity_strategy
 from .typing import (
@@ -17,12 +16,16 @@ from .typing import (
 __all__ = [
     "jellyjoin",
     "Jelly",
+    "DROP",
 ]
 
 logger = logging.getLogger(__name__)
 
 # internal type only used by private functions
 AssignmentList = List[Tuple[int, int, float]]
+
+# sentinal value indicating a column should be dropped
+DROP = ""
 
 # these column names are used for in the middle association dataframe are long
 # to reduce the probability of conflicting with user column names.
@@ -186,12 +189,18 @@ def _validate_jellyjoin_arguments(
     if suffixes[0] == suffixes[1]:
         raise ValueError("suffixes cannot be the same.")
 
-    # similarity column name
+    # column names
     if similarity_column is not None:
         if not isinstance(similarity_column, str):
             raise TypeError("similarity_column must be a string.")
-        if not similarity_column:
-            raise ValueError("similarity_column cannot be an empty string.")
+
+    if left_index_column is not None:
+        if not isinstance(left_index_column, str):
+            raise TypeError("left_index_column must be a string.")
+
+    if right_index_column is not None:
+        if not isinstance(right_index_column, str):
+            raise TypeError("right_index_column must be a string.")
 
     # allow many values
     if allow_many not in get_args(AllowManyLiteral):
@@ -240,9 +249,9 @@ def jellyjoin(
     threshold: float = 0.0,
     allow_many: AllowManyLiteral = "neither",
     how: HowLiteral = "inner",
-    left_index_column: str | None = "Left",
-    right_index_column: str | None = "Right",
-    similarity_column: str | None = "Similarity",
+    left_index_column: str = "Left",
+    right_index_column: str = "Right",
+    similarity_column: str = "Similarity",
     suffixes: Collection = ("_left", "_right"),
     return_similarity_matrix: bool = False,
 ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
@@ -267,6 +276,7 @@ def jellyjoin(
         Column name in the left DataFrame to use for matching.
     right_on : str, optional
         Column name in the right DataFrame to use for matching.
+
     strategy : StrategyLike, optional
         Similarity strategy to use (e.g., `"jaro_winkler"`, `"openai"`,
         or a `jellyjoin.Strategy` instance). If `None`, an automatic
@@ -278,15 +288,16 @@ def jellyjoin(
         Controls whether multiple matches per row are allowed on each side.
     how : {"inner", "left", "right", "outer"}, default="inner"
         Join type determining which rows to include in the final output.
-    left_index_column : str or None, default="Left"
-        Name for the column holding the `.iloc` index of each left record.
-        Pass `None` to suppress this column.
-    right_index_column : str or None, default="Right"
-        Name for the column holding the `.iloc` index of each right record.
-        Pass `None` to suppress this column.
-    similarity_column : str or None, default="Similarity"
-        Name for the column containing similarity scores.
-        Pass `None` to omit this column.
+
+    left_index_column : str , default="Left"
+        Name for the output column holding the `.iloc` index of each left record.
+        Pass `jellyjoin.DROP` to omit this column.
+    right_index_column : str, default="Right"
+        Name for the output column holding the `.iloc` index of each right record.
+        Pass `jellyjoin.DROP` to omit this column.
+    similarity_column : str, default="Similarity"
+        Name for the output column containing similarity scores.
+        Pass `jellyjoin.DROP` to omit this column.
     suffixes : Collection of str, default=("_left", "_right")
         Suffixes to append to overlapping column names from the left and
         right DataFrames to ensure uniqueness.
@@ -375,21 +386,6 @@ def jellyjoin(
         return result
 
 
-class JellyJoinKwargs(TypedDict, total=False):
-    on: str | None
-    left_on: str | None
-    right_on: str | None
-    strategy: StrategyLike | None
-    threshold: float | None
-    allow_many: AllowManyLiteral | None
-    how: HowLiteral | None
-    left_index_column: str | None
-    right_index_column: str | None
-    similarity_column: str | None
-    suffixes: Collection | None
-    return_similarity_matrix: bool | None
-
-
 class Jelly:
     def __init__(
         self,
@@ -401,9 +397,9 @@ class Jelly:
         threshold: float = 0.0,
         allow_many: AllowManyLiteral = "neither",
         how: HowLiteral = "inner",
-        left_index_column: str | None = "Left",
-        right_index_column: str | None = "Right",
-        similarity_column: str | None = "Similarity",
+        left_index_column: str = "Left",
+        right_index_column: str = "Right",
+        similarity_column: str = "Similarity",
         suffixes: Collection = ("_left", "_right"),
         return_similarity_matrix: bool = False,
     ) -> None:
@@ -418,6 +414,7 @@ class Jelly:
             Column name in the left DataFrame to use for matching.
         right_on : str, optional
             Column name in the right DataFrame to use for matching.
+
         strategy : StrategyLike, optional
             Similarity strategy to use (e.g., "jaro_winkler", "openai", or a Strategy instance).
         threshold : float, default=0.0
@@ -426,12 +423,16 @@ class Jelly:
             Controls whether multiple matches per row are allowed on each side.
         how : {"inner", "left", "right", "outer"}, default="inner"
             Join type determining which rows to include in the final output.
-        left_index_column : str or None, default="Left"
+
+        left_index_column : str, default="Left"
             Name for the column holding the `.iloc` index of each left record.
-        right_index_column : str or None, default="Right"
+            Pass `jellyjoin.DROP` to omit this column in the output dataframe.
+        right_index_column : str, default="Right"
             Name for the column holding the `.iloc` index of each right record.
-        similarity_column : str or None, default="Similarity"
+            Pass `jellyjoin.DROP` to omit this column in the output dataframe.
+        similarity_column : str, default="Similarity"
             Name for the column containing similarity scores.
+            Pass `jellyjoin.DROP` to omit this column in the output dataframe.
         suffixes : Collection of str, default=("_left", "_right")
             Suffixes appended to overlapping column names from left/right DataFrames.
         return_similarity_matrix : bool, default=False
@@ -447,7 +448,8 @@ class Jelly:
         )
         return_similarity_matrix = bool(return_similarity_matrix)
 
-        self.options = {
+        self.defaults = {
+            "on": on,
             "left_on": left_on,
             "right_on": right_on,
             "strategy": strategy,
@@ -465,7 +467,19 @@ class Jelly:
         self,
         left: pd.DataFrame | Collection,
         right: pd.DataFrame | Collection,
-        **kwargs: Unpack[JellyJoinKwargs],
+        *,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        strategy: StrategyLike | None = None,
+        threshold: float | None = None,
+        allow_many: AllowManyLiteral | None = None,
+        how: HowLiteral | None = None,
+        left_index_column: str | None = None,
+        right_index_column: str | None = None,
+        similarity_column: str | None = None,
+        suffixes: Collection | None = None,
+        return_similarity_matrix: bool | None = None,
     ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
         """
         Join two data sources by computing pairwise semantic similarity,
@@ -484,6 +498,7 @@ class Jelly:
             Column name in the left DataFrame to use for matching.
         right_on : str, optional
             Column name in the right DataFrame to use for matching.
+
         strategy : StrategyLike, optional
             Similarity strategy to use (e.g., "jaro_winkler", "openai",
             or a Strategy instance).
@@ -493,14 +508,19 @@ class Jelly:
             Controls whether multiple matches per row are allowed on each side.
         how : {"inner", "left", "right", "outer"}, optional
             Join type determining which rows to include in the final output.
-        left_index_column : str or None, optional
-            Name for the column holding the `.iloc` index of each left record.
-            Pass `None` to suppress this column.
-        right_index_column : str or None, optional
-            Name for the column holding the `.iloc` index of each right record.
-            Pass `None` to suppress this column.
-        similarity_column : str or None, optional
-            Name for the column containing similarity scores. Pass `None` to omit.
+
+        left_index_column : str, optional
+            Name for the output column holding the `.iloc` index of each left record.
+            Normally defaults to "Left".
+            Pass `jellyjoin.DROP` to omit this column.
+        right_index_column : str, optional
+            Name for the output column holding the `.iloc` index of each right record.
+            Normally defaults to "Right".
+            Pass `jellyjoin.DROP` to omit this column.
+        similarity_column : str, optional
+            Name for the output column containing similarity scores.
+            Normally defaults to "Similarity".
+            Pass `jellyjoin.DROP` to omit this column.
         suffixes : Collection of str, optional
             Suffixes to append to overlapping column names from the left and right DataFrames.
         return_similarity_matrix : bool, optional
@@ -518,11 +538,38 @@ class Jelly:
         TypeError
             If argument types are incompatible with expected input formats.
         """
-        arguments = {
-            "left": left,
-            "right": right,
-            **self.options,
-            **kwargs,
+
+        options = {
+            "on": on,
+            "left_on": left_on,
+            "right_on": right_on,
+            "strategy": strategy,
+            "threshold": threshold,
+            "allow_many": allow_many,
+            "how": how,
+            "left_index_column": left_index_column,
+            "right_index_column": right_index_column,
+            "similarity_column": similarity_column,
+            "suffixes": suffixes,
+            "return_similarity_matrix": return_similarity_matrix,
         }
 
-        return jellyjoin(**arguments)
+        # filter out all options which are None.
+        options = {k: v for k, v in options.items() if v is not None}
+
+        # copy the defaults so we can modify it
+        defaults = self.defaults.copy()
+
+        # avoid the error caused by defining both "on" and "left/right_on"
+        if "on" in options:
+            defaults.pop("left_on", None)
+            defaults.pop("right_on", None)
+        if "left_on" in options or "right_on" in options:
+            defaults["left_on"] = defaults["on"]
+            defaults["right_on"] = defaults["on"]
+            defaults.pop("on")
+
+        # combine the options and defaults, with options overriding defaults.
+        kwargs = {**defaults, **options}
+
+        return jellyjoin(left, right, **kwargs)

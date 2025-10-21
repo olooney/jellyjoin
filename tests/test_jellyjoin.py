@@ -411,10 +411,11 @@ def test_jellyjoin_validation():
     with pytest.raises(TypeError, match=r"similarity_column must be a string\."):
         jj.jellyjoin([], [], similarity_column=123)
 
-    with pytest.raises(
-        ValueError, match=r"similarity_column cannot be an empty string\."
-    ):
-        jj.jellyjoin([], [], similarity_column="")
+    with pytest.raises(TypeError, match=r"left_index_column must be a string\."):
+        jj.jellyjoin([], [], left_index_column=123)
+
+    with pytest.raises(TypeError, match=r"right_index_column must be a string\."):
+        jj.jellyjoin([], [], right_index_column=123)
 
     with pytest.raises(
         ValueError, match=r'allow_many must be "left", "right", "both", or "neither"\.'
@@ -482,7 +483,7 @@ def test_jellyjoin_options():
         allow_many="left",
         how="outer",
         left_index_column="left_index",
-        right_index_column=None,
+        right_index_column=jj.DROP,
         similarity_column="score",
         suffixes=("_2024", "_2025"),
     )
@@ -517,9 +518,18 @@ def test_jellyjoin_drop_columns():
     df = jj.jellyjoin(
         ["x", "y"],
         ["y", "x"],
-        left_index_column=None,
-        right_index_column=None,
-        similarity_column=None,
+        left_index_column=jj.DROP,
+        right_index_column=jj.DROP,
+        similarity_column=jj.DROP,
+    )
+    assert df.columns.tolist() == ["Left Value", "Right Value"]
+
+    df = jj.jellyjoin(
+        ["x", "y"],
+        ["y", "x"],
+        left_index_column="",
+        right_index_column="",
+        similarity_column="",
     )
     assert df.columns.tolist() == ["Left Value", "Right Value"]
 
@@ -532,18 +542,41 @@ def test_jellyjoin_with_lists(left_sections, right_sections):
 
 
 def test_jellyjoin_return_similarity_matrix(left_words, right_words):
+    def validate_df(df):
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == min(len(left_words), len(right_words))
+        assert df["Similarity"].between(0.0, 1.0).all()
+
+    def validate_matrix(matrix):
+        assert isinstance(matrix, np.ndarray)
+        assert matrix.shape == (len(left_words), len(right_words))
+
     df, matrix = jj.jellyjoin(
         left_words,
         right_words,
         return_similarity_matrix=True,
     )
+    validate_df(df)
+    validate_matrix(matrix)
 
-    assert isinstance(df, pd.DataFrame)
-    assert len(df) == min(len(left_words), len(right_words))
-    assert df["Similarity"].between(0.0, 1.0).all()
+    jelly = jj.Jelly(return_similarity_matrix=True)
+    df, matrix = jelly.join(left_words, right_words)
+    validate_df(df)
+    validate_matrix(matrix)
 
-    assert isinstance(matrix, np.ndarray)
-    assert matrix.shape == (len(left_words), len(right_words))
+    jelly = jj.Jelly()
+    df, matrix = jelly.join(left_words, right_words, return_similarity_matrix=True)
+    validate_df(df)
+    validate_matrix(matrix)
+
+    jelly = jj.Jelly(return_similarity_matrix=False)
+    df, matrix = jelly.join(left_words, right_words, return_similarity_matrix=True)
+    validate_df(df)
+    validate_matrix(matrix)
+
+    jelly = jj.Jelly(return_similarity_matrix=True)
+    df = jelly.join(left_words, right_words, return_similarity_matrix=False)
+    validate_df(df)
 
 
 @pytest.mark.parametrize("how", ["inner", "left", "right", "outer"])
@@ -771,3 +804,314 @@ def test_jelly_class(left_words, right_words):
     assert "v1" in df3.columns
     assert "v2" in df3.columns
     assert len(df3) >= 1
+
+
+def test_jelly_default_on(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        on="API Path",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        right_on="UI Field Name",
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+
+
+def test_jelly_left_right_on_in_constructor(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+    assert df.columns.tolist() == [
+        "Left",
+        "Right",
+        "Similarity",
+        "API Path",
+        "Prefix",
+        "UI Field Name",
+        "Type",
+    ]
+
+
+def test_jelly_left_right_on_in_join(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        left_on="API Path",
+        right_on="UI Field Name",
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+    assert df.columns.tolist() == [
+        "Left",
+        "Right",
+        "Similarity",
+        "API Path",
+        "Prefix",
+        "UI Field Name",
+        "Type",
+    ]
+
+
+def test_jelly_both_on_default_and_right_on_override(left_df, right_df):
+    # "on" supplies left_on; right_on override is provided at call time
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        on="API Path",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        right_on="UI Field Name",
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+    assert df.columns.tolist() == [
+        "Left",
+        "Right",
+        "Similarity",
+        "API Path",
+        "Prefix",
+        "UI Field Name",
+        "Type",
+    ]
+
+
+def test_jelly_rename_output_columns_in_constructor(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+        left_index_column="L",
+        right_index_column="R",
+        similarity_column="S",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert "S" in df.columns and "Similarity" not in df.columns
+    assert "L" in df.columns and "Left" not in df.columns
+    assert "R" in df.columns and "Right" not in df.columns
+    assert df["S"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+
+
+def test_jelly_rename_output_columns_in_join(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        left_index_column="L",
+        right_index_column="R",
+        similarity_column="S",
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert "S" in df.columns and "Similarity" not in df.columns
+    assert "L" in df.columns and "Left" not in df.columns
+    assert "R" in df.columns and "Right" not in df.columns
+    assert df["S"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+
+
+def test_jelly_drop_output_columns_in_constructor(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+        left_index_column=jj.DROP,
+        right_index_column=jj.DROP,
+        similarity_column=jj.DROP,
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert "Similarity" not in df.columns
+    assert "Left" not in df.columns
+    assert "Right" not in df.columns
+    assert len(df) > 0
+    for c in ["API Path", "UI Field Name"]:
+        assert c in df.columns
+
+
+def test_jelly_drop_output_columns_in_join(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        left_index_column=jj.DROP,
+        right_index_column=jj.DROP,
+        similarity_column=jj.DROP,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert "Similarity" not in df.columns
+    assert "Left" not in df.columns
+    assert "Right" not in df.columns
+    assert len(df) > 0
+    for c in ["API Path", "UI Field Name"]:
+        assert c in df.columns
+
+
+def test_jelly_constructor_rename_overridden_by_join_drop(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+        left_index_column="L",
+        right_index_column="R",
+        similarity_column="S",
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        left_index_column=jj.DROP,
+        right_index_column=jj.DROP,
+        similarity_column=jj.DROP,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert "S" not in df.columns and "Similarity" not in df.columns
+    assert "L" not in df.columns and "Left" not in df.columns
+    assert "R" not in df.columns and "Right" not in df.columns
+    assert len(df) > 0
+
+
+def test_jelly_constructor_drop_overridden_by_join_rename(left_df, right_df):
+    jelly_many_to_many = jj.Jelly(
+        strategy=jj.NomicEmbeddingStrategy(),
+        threshold=0.4,
+        allow_many="both",
+        how="outer",
+        left_on="API Path",
+        right_on="UI Field Name",
+        left_index_column=jj.DROP,
+        right_index_column=jj.DROP,
+        similarity_column=jj.DROP,
+    )
+    df = jelly_many_to_many.join(
+        left_df,
+        right_df,
+        left_index_column="L",
+        right_index_column="R",
+        similarity_column="S",
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    assert "S" in df.columns and "Similarity" not in df.columns
+    assert "L" in df.columns and "Left" not in df.columns
+    assert "R" in df.columns and "Right" not in df.columns
+    assert df["S"].dropna().between(0.0, 1.0).all()
+    assert len(df) > 0
+
+
+def test_jelly_on():
+    left = pd.DataFrame(
+        {
+            "name": ["alice", "bob"],
+            "id": ["1", "2"],
+        }
+    )
+    right = pd.DataFrame(
+        {
+            "name": ["Alice", "Bobby"],
+            "id": ["20", "10"],
+        }
+    )
+
+    df_func = jj.jellyjoin(
+        left,
+        right,
+        on="name",
+        strategy="jaro_winkler",
+        threshold=0.0,
+    )
+    assert isinstance(df_func, pd.DataFrame)
+    assert df_func["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df_func) > 0
+
+    # Jelly defaults
+    jelly = jj.Jelly(
+        on="name",
+        strategy="jaro_winkler",
+        threshold=0.0,
+    )
+    df_class = jelly.join(left, right)
+
+    assert isinstance(df_class, pd.DataFrame)
+    assert df_class["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df_class) > 0
+
+    # .join method override
+    df_class = jelly.join(left, right, on="id")
+
+    assert isinstance(df_class, pd.DataFrame)
+    assert df_class["Similarity"].dropna().between(0.0, 1.0).all()
+    assert len(df_class) > 0
+
+    # verify that "on" was override and we are now joining on "id" instead.
+    assert df_class.loc[0, "name_left"] == "alice"
+    assert df_class.loc[0, "name_right"] == "Bobby"
+    assert df_class.loc[1, "name_left"] == "bob"
+    assert df_class.loc[1, "name_right"] == "Alice"

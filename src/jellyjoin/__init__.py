@@ -1,6 +1,7 @@
 import importlib.metadata as _imd
 
 from ._join import (
+    DROP,
     Jelly,
     jellyjoin,
 )
@@ -26,6 +27,7 @@ from .strategy import (
 __all__ = [
     "jellyjoin",
     "Jelly",
+    "DROP",
     "hamming_similarity",
     "levenshtein_similarity",
     "damerau_levenshtein_similarity",
