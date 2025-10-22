@@ -826,7 +826,7 @@ def test_jelly_default_on(left_df, right_df):
 
 def test_jelly_left_right_on_in_constructor(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -854,7 +854,7 @@ def test_jelly_left_right_on_in_constructor(left_df, right_df):
 
 def test_jelly_left_right_on_in_join(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -883,7 +883,7 @@ def test_jelly_left_right_on_in_join(left_df, right_df):
 def test_jelly_both_on_default_and_right_on_override(left_df, right_df):
     # "on" supplies left_on; right_on override is provided at call time
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -911,7 +911,7 @@ def test_jelly_both_on_default_and_right_on_override(left_df, right_df):
 
 def test_jelly_rename_output_columns_in_constructor(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -936,7 +936,7 @@ def test_jelly_rename_output_columns_in_constructor(left_df, right_df):
 
 def test_jelly_rename_output_columns_in_join(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -961,7 +961,7 @@ def test_jelly_rename_output_columns_in_join(left_df, right_df):
 
 def test_jelly_drop_output_columns_in_constructor(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -987,7 +987,7 @@ def test_jelly_drop_output_columns_in_constructor(left_df, right_df):
 
 def test_jelly_drop_output_columns_in_join(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -1013,7 +1013,7 @@ def test_jelly_drop_output_columns_in_join(left_df, right_df):
 
 def test_jelly_constructor_rename_overridden_by_join_drop(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
@@ -1040,7 +1040,7 @@ def test_jelly_constructor_rename_overridden_by_join_drop(left_df, right_df):
 
 def test_jelly_constructor_drop_overridden_by_join_rename(left_df, right_df):
     jelly_many_to_many = jj.Jelly(
-        strategy=jj.NomicEmbeddingStrategy(),
+        strategy=jj.PairwiseStrategy(),
         threshold=0.4,
         allow_many="both",
         how="outer",
