@@ -117,7 +117,7 @@ scores = strategy(["apple"], ["orange"])
 ### Custom Example
 
 You can use the class with other embedding models or even other OpenAI
-comptible servers with some configuration. However, you will need to look up
+compatible servers with some configuration. However, you will need to look up
 the details such as `max_tokens` to ensure truncation works correctly for
 other embedding models.
 
@@ -126,8 +126,8 @@ from jellyjoin import OpenAIEmbeddingStrategy
 import openai
 
 client = openai.OpenAI(
-    base_url="<your-openai-compatible-server>",
-    api_key="your-api-key"
+    base_url="<your-openai-compatible-server>/v1",
+    api_key="<your-api-key>"
 )
 strategy = OpenAIEmbeddingStrategy(
     embedding_model="text-embedding-ada-002",
@@ -138,14 +138,6 @@ strategy = OpenAIEmbeddingStrategy(
 scores = strategy(["apple"], ["orange"])
 ```
 
-
----
-
-## Azure OpenAI
-
-You can also connect using Azure OpenAI with `azure.identity.DefaultAzureCredentials`.
-
-### Installation
 
 ---
 
