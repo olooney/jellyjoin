@@ -163,15 +163,10 @@ Records that don't join to anything on the other side (with a similarity greater
 
 ## Advanced Usage
 
-TODO: Configuring custom similarity strategies
+[Similarity Strategy Guide](docs/similarity_strategy_guide.md) (Work in Progress)
 
 TODO: Hungarian Algorithm.
 
-You'll need to have ollama running, and pull the embedding model you want, e.g.:
-
-```
-ollama pull nomic-embed-text:v1.5
-```
 
 
 ## Development

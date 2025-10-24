@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jellyjoin"
-version = "0.2.6"
+version = "0.2.7"
 description = "Utilities for dataset similarity and joins"
 authors = [{ name = "Oran Looney", email = "olooney@gmail.com" }]
 readme = "README.md"
@@ -74,8 +74,20 @@ fix = true
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
-ignore = ["E501", "F403"]
+select = [
+    "E",   # PEP 8
+    "F",   # Pyflakes
+    "I",   # import sort
+    "B",   # bugbear
+    "UP",  # PyUpgrade
+    "TRY", # Tryceratops
+]
+ignore = [
+    "E501",   # line length
+    "TRY003", # long exception messages
+    "TRY300", # return outside of else
+    "B905",   # explicit strict in zip()
+]
 
 [tool.pytest.ini_options]
 addopts = "--cov=src/jellyjoin --cov-report=term-missing"

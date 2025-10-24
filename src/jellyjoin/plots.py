@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +18,7 @@ def plot_similarity_matrix(
     similarity_matrix: np.ndarray,
     *,
     ax: Axes | None = None,
-    figsize: Tuple[float, float] | None = None,
+    figsize: tuple[float, float] | None = None,
     left_labels: Iterable[str] | None = None,
     right_labels: Iterable[str] | None = None,
     cmap: str = "Blues",
@@ -27,7 +27,7 @@ def plot_similarity_matrix(
     label_fontsize: int = 9,
     title: str = "Similarity Matrix",
     show_colorbar: bool = True,
-) -> Tuple[Figure, Axes]:
+) -> tuple[Figure, Axes]:
     """
     Display a 2D similarity matrix as a labeled heatmap. This function
     uses `matplotlib.pyplot` but does not call `show()`.
@@ -116,7 +116,7 @@ def plot_associations(
     association_df: pd.DataFrame,
     *,
     ax: Axes | None = None,
-    figsize: Tuple[float, float] | None = None,
+    figsize: tuple[float, float] | None = None,
     indent: float = 0.2,
     text_gap: float = 0.02,
     left_column: str = "Left Value",
@@ -128,7 +128,7 @@ def plot_associations(
     line_width: float = 0.8,
     label_fontsize: int = 10,
     title: str | None = None,
-) -> Tuple[Figure, Axes]:
+) -> tuple[Figure, Axes]:
     """
     Display a "connect-the-dots" plot showing pairwise associations between
     left and right values. This function uses `matplotlib.pyplot` but does not

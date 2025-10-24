@@ -244,6 +244,21 @@ def test_nomic_strategy_config(left_words, right_words):
     assert matrix.dtype == np.float64
 
 
+@skip_if_nomic_not_available
+def test_nomic_strategy_task_type_pair(left_words, right_words):
+    nomic_strategy = jj.NomicEmbeddingStrategy(
+        embedding_model="nomic-embed-text-v1.5",
+        preprocessor=lambda x: x.lower(),
+        task_type=("search_query", "search_document"),
+        dimensionality=100,
+        device="gpu",
+        dtype=np.float64,
+    )
+    matrix = nomic_strategy(left_words, right_words)
+    assert matrix.shape == (len(left_words), len(right_words))
+    assert matrix.dtype == np.float64
+
+
 def test_triple_join():
     from jellyjoin._join import _triple_join
 

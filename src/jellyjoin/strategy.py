@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Collection
 from pathlib import Path
-from typing import List, Literal
+from typing import Literal
 
 import numpy as np
 from numpy.linalg import norm
@@ -174,7 +174,7 @@ class OpenAIEmbeddingStrategy(EmbeddingStrategy):
         truncated = tokens[: self.max_tokens]
         return self.encoding.decode(truncated)
 
-    def _call_embedding_api(self, batch: List[str]) -> List[ArrayLike]:
+    def _call_embedding_api(self, batch: list[str]) -> list[ArrayLike]:
         logger.debug("Calling OpenAI embeddings API with %d strings.", len(batch))
 
         response = self.client.embeddings.create(
@@ -219,7 +219,8 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         self,
         embedding_model: str = "nomic-embed-text-v1.5",
         preprocessor: PreprocessorCallable = identity,
-        task_type: TaskTypeLiteral = "search_document",
+        task_type: TaskTypeLiteral
+        | tuple[TaskTypeLiteral, TaskTypeLiteral] = "search_document",
         dimensionality: int | None = None,
         device: Literal["cpu", "gpu"] | None = None,
         dtype: DTypeLike = np.float32,
@@ -236,6 +237,7 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
             A callable applied to each text before embedding. Defaults to `identity`.
         task_type:
             One of {"search_document","search_query","classification","clustering"}.
+            OR, a pair of the same, to used used on the left and right respectively.
         dimensionality : int | None
             Output embedding size (v1.5 supports 64..768). None = model default.
         device:
@@ -252,27 +254,33 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
             )
 
         self.nomic_embed = nomic_embed
-
         self.embedding_model = embedding_model
-        self.task_type = task_type
+
+        # always internally store task type in left, right form
+        if not isinstance(task_type, tuple):
+            task_type = (task_type, task_type)
+        self.task_types = task_type
+
         self.dimensionality = dimensionality
         self.device = device
         self.dtype = dtype
 
         super().__init__(preprocessor=preprocessor)
 
-    def embed(self, texts: Collection[str]) -> np.ndarray:
+    def embed(self, texts: Collection[str], right=False) -> np.ndarray:
         """
         Return embeddings for `texts` with shape (len(texts), D).
         """
         if not len(texts):
             return np.zeros((0, 0), dtype=self.dtype)
 
+        side_index = int(right)
+
         # nomic does its own batching under the hood
         result = self.nomic_embed.text(
             texts=texts,
             model=self.embedding_model,
-            task_type=self.task_type,
+            task_type=self.task_types[side_index],
             inference_mode="local",
             long_text_mode="truncate",
             device=self.device,
@@ -437,7 +445,7 @@ def get_similarity_strategy(
                         '"ollama", '
                         "or any valid similarity function name, "
                         'e.g. "jaro_winkler"'
-                    )
+                    ) from None
         case _ if callable(strategy):
             return strategy
         case _:

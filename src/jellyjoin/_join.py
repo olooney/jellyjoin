@@ -1,6 +1,6 @@
 import logging
-from collections.abc import Collection
-from typing import Iterable, List, Tuple, get_args
+from collections.abc import Collection, Iterable
+from typing import get_args
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 # internal type only used by private functions
-AssignmentList = List[Tuple[int, int, float]]
+AssignmentList = list[tuple[int, int, float]]
 
 # sentinal value indicating a column should be dropped
 DROP = ""
@@ -134,7 +134,7 @@ def _coerce_to_dataframes(
     on: str | None,
     left_on: str | None,
     right_on: str | None,
-) -> Tuple[pd.DataFrame, pd.DataFrame, str, str]:
+) -> tuple[pd.DataFrame, pd.DataFrame, str, str]:
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
         left = pd.DataFrame({left_on or "Left Value": list(left)})
@@ -215,7 +215,7 @@ def _prepare_middle_columns(
     left_index_column: str,
     right_index_column: str,
     similarity_column: str,
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     """
     Figures out the permanent or temporary names to use for the middle column,
     and which temporary columns to drop afterwarsd
@@ -254,7 +254,7 @@ def jellyjoin(
     similarity_column: str = "Similarity",
     suffixes: Collection = ("_left", "_right"),
     return_similarity_matrix: bool = False,
-) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
+) -> pd.DataFrame | tuple[pd.DataFrame, np.ndarray]:
     """
     Join two data sources by computing pairwise semantic similarity.
 
@@ -480,7 +480,7 @@ class Jelly:
         similarity_column: str | None = None,
         suffixes: Collection | None = None,
         return_similarity_matrix: bool | None = None,
-    ) -> pd.DataFrame | Tuple[pd.DataFrame, np.ndarray]:
+    ) -> pd.DataFrame | tuple[pd.DataFrame, np.ndarray]:
         """
         Join two data sources by computing pairwise semantic similarity,
         using the defaults set on the `Jelly` instance unless overridden.

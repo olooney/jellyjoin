@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from collections.abc import Collection
-from typing import Callable, Literal, TypeAlias
+from collections.abc import Callable, Collection
+from typing import Literal, TypeAlias
 
 import numpy as np
 
