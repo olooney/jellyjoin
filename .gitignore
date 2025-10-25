@@ -2,6 +2,7 @@ dist/
 notebooks/
 REVIEW.md
 .coverage
+.dotenv
 
 # Byte-compiled / cache files
 __pycache__/

@@ -4,24 +4,31 @@
 - [X] unwind wildcards
 - [X] Jelly class
 - [X] rename core.py
-- [ ] README custom similarity strategy
+- [X] README custom similarity strategy
 - [ ] README Algorithm and Diagrams
+- [ ] Review all documentation
 - [ ] beta release
 
 Backlog
 -------
 
+- [ ] NumPy docstrings?
+- [ ] Sphinx / Readthedocs?
+- [ ] Document Section Example
+- [ ] Entity Resolution Example
+- [ ] Tao Te Ching Example
+- [ ] Visual diff utility?
+- [ ] Cluster / Bicluster Example
 - [ ] Better support for indexed dataframes?
 - [ ] allow custom Mahalanobis distances with PSD matrix
 - [ ] join option for blocking?
-- [ ] Dedupe / clustering?
-- [ ] biclustering approach?
 - [ ] support polars?
 - [ ] CLI tool
 
 Done
 ----
 
+- [X] Add additional ruff checks
 - [X] Code coverage report not working in Github Actions?
 - [X] Review README against recent API changes
 - [X] jellyjoin() docstring

@@ -135,11 +135,16 @@ def _coerce_to_dataframes(
     left_on: str | None,
     right_on: str | None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, str, str]:
+    # flag the special case where they're identical
+    identical = left is right
+
     # Convert inputs to dataframes if they aren't already
     if not isinstance(left, pd.DataFrame):
         left = pd.DataFrame({left_on or "Left Value": list(left)})
 
-    if not isinstance(right, pd.DataFrame):
+    if identical:
+        right = left
+    elif not isinstance(right, pd.DataFrame):
         right = pd.DataFrame({right_on or "Right Value": list(right)})
 
     # handle the shared "on" column name

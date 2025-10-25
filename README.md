@@ -163,7 +163,7 @@ Records that don't join to anything on the other side (with a similarity greater
 
 ## Advanced Usage
 
-[Similarity Strategy Guide](docs/similarity_strategy_guide.md) (Work in Progress)
+[Similarity Strategy Guide](https://github.com/olooney/jellyjoin/blob/main/docs/similarity_strategy_guide.md) (Work in Progress)
 
 TODO: Hungarian Algorithm.
 
@@ -178,6 +178,15 @@ git clone https://github.com/olooney/jellyjoin.git
 cd jellyjoin
 pip install -e .[dev]
 ```
+
+The jellyjoin unit tests skip test cases that can't be run due to missing
+optional dependencies, so to run the full test suite:
+
+1. Set up a valid `OPENAPI_API_KEY` as an environment variable or place it in a
+`.dotenv` file somewhere it can be found by `dotenv`.
+2. Ensure the "nomic-embed-text-v1.5" weights are downloaded and cached.
+3. Start a local ollama server running and pull the "nomic-embed-text:v1.5" model.
+
 
 Run tests:
 

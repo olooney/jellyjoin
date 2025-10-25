@@ -56,6 +56,10 @@ class EmbeddingStrategy(SimilarityStrategy):
     `max_tokens` tokens according to the tiktoken `encoding`.
     """
 
+    # override this property and set it to True if your embedding model cannot
+    # assume that left and right embedding calls are identical.
+    asymetric = False
+
     def __init__(
         self,
         preprocessor: PreprocessorCallable = identity,
@@ -83,12 +87,16 @@ class EmbeddingStrategy(SimilarityStrategy):
         elif not len(right_texts):
             return np.zeros((len(left_texts), 0))
 
-        left_texts = [self.preprocessor(text) for text in left_texts]
-        right_texts = [self.preprocessor(text) for text in right_texts]
+        # left
+        processed_left_texts = [self.preprocessor(text) for text in left_texts]
+        left_embeddings = self.embed(processed_left_texts, right=False)
 
-        # compute embeddings
-        left_embeddings = self.embed(left_texts)
-        right_embeddings = self.embed(right_texts)
+        # right
+        if not self.asymetric and left_texts is right_texts:
+            right_embeddings = left_embeddings
+        else:
+            processed_right_texts = [self.preprocessor(text) for text in right_texts]
+            right_embeddings = self.embed(processed_right_texts, right=True)
 
         # calculate similarity matrix
         similarity_matrix = left_embeddings @ right_embeddings.T
@@ -185,7 +193,7 @@ class OpenAIEmbeddingStrategy(EmbeddingStrategy):
 
         return [e.embedding for e in response.data]
 
-    def embed(self, texts: Collection[str]) -> np.ndarray:
+    def embed(self, texts: Collection[str], *, right: bool = False) -> np.ndarray:
         """
         Get embeddings from the OpenAI client in batches of size `self.batch_size`.
         Returns a matrix of shape `(len(texts), D)`, where `D` is the number of
@@ -259,6 +267,9 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
         # always internally store task type in left, right form
         if not isinstance(task_type, tuple):
             task_type = (task_type, task_type)
+            self.asymetric = False
+        else:
+            self.asymetric = True
         self.task_types = task_type
 
         self.dimensionality = dimensionality
@@ -267,7 +278,7 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
 
         super().__init__(preprocessor=preprocessor)
 
-    def embed(self, texts: Collection[str], right=False) -> np.ndarray:
+    def embed(self, texts: Collection[str], *, right=False) -> np.ndarray:
         """
         Return embeddings for `texts` with shape (len(texts), D).
         """
@@ -342,7 +353,7 @@ class OllamaEmbeddingStrategy(EmbeddingStrategy):
         )["embedding"]
         return vector / norm(vector)
 
-    def embed(self, texts: Collection[str]) -> np.ndarray:
+    def embed(self, texts: Collection[str], *, right: bool = False) -> np.ndarray:
         """
         Return embeddings for `texts` with shape (len(texts), D).
         Each text is sent in its own request (no batching).
@@ -510,7 +521,7 @@ def get_automatic_strategy() -> SimilarityStrategy:  # pragma: no cover
     # Ollama
     try:
         strategy = OllamaEmbeddingStrategy()
-        strategy.embed("testing ollama server availability")
+        strategy.embed(["testing ollama server availability"])
         _cached_strategy = strategy
         logger.warning("Instantiated and cached OllamaEmbeddingStrategy.")
         return strategy

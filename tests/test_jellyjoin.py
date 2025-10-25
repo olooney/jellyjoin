@@ -1,16 +1,25 @@
 import os
 import re
 from functools import wraps
+from unittest.mock import Mock
 
 import dotenv
 import numpy as np
 import pandas as pd
 import pandas.testing as pdt
 import pytest
+from numpy.typing import ArrayLike
 
 import jellyjoin as jj
 
 dotenv.load_dotenv()
+
+
+def assert_in_unit_interval(values: ArrayLike, tol: float = 1e-6) -> None:
+    """Assert that all float values lie within [0, 1], within a given tolerance."""
+    array = np.asarray(values, dtype=float)
+    assert np.all(array >= -tol), f"Values below 0: {array[array < -tol]}"
+    assert np.all(array <= 1.0 + tol), f"Values above 1: {array[array > 1.0 + tol]}"
 
 
 def skip_if_openai_not_available(test_func):
@@ -38,10 +47,25 @@ def skip_if_nomic_not_available(test_func):
 
 def skip_if_ollama_not_available(test_func):
     """Skip test if the Ollama package is not installed."""
+    ollama_server_running = None
 
     @wraps(test_func)
     def wrapper(*args, **kwargs):
+        nonlocal ollama_server_running
+
         pytest.importorskip("ollama", reason="ollama package not installed")
+
+        # try a test ping of the ollama server if we haven't done so yet
+        if ollama_server_running is None:
+            try:
+                strategy = jj.OllamaEmbeddingStrategy()
+                strategy.embed(["testing ollama server availability"])
+                ollama_server_running = True
+            except Exception:
+                ollama_server_running = False
+
+        if ollama_server_running is False:
+            pytest.skip("Could not connect to local ollama server.")
         return test_func(*args, **kwargs)
 
     return wrapper
@@ -166,6 +190,25 @@ def empties(request):
 def test_version():
     assert re.match(r"^\d+\.\d+\.\d+$", jj.__version__)
     assert jj.__version__ > "0.0.0"
+
+
+def test_assert_in_unit_interval():
+    # valid inputs
+    assert_in_unit_interval([0.0, 0.5, 1.0])
+    assert_in_unit_interval(np.array([0.0, 1e-6, 1.0 - 1e-6]))
+    assert_in_unit_interval(pd.Series([0, 0.25, 0.75, 1]))
+
+    # below zero
+    with pytest.raises(AssertionError):
+        assert_in_unit_interval([-1e-4, 0.5, 0.9])
+
+    # above one
+    with pytest.raises(AssertionError):
+        assert_in_unit_interval([0.1, 1.0001, 0.9])
+
+    # mixed array, still okay within tolerance
+    arr = np.array([-1e-7, 0.5, 1.0 + 5e-7])
+    assert_in_unit_interval(arr, tol=1e-6)
 
 
 @pytest.mark.parametrize("fn", jj.similarity.FUNCTION_MAP.values())
@@ -553,14 +596,99 @@ def test_jellyjoin_with_lists(left_sections, right_sections):
     df = jj.jellyjoin(left_sections, right_sections)
     assert isinstance(df, pd.DataFrame)
     assert len(df) == min(len(left_sections), len(right_sections))
-    assert df["Similarity"].between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"])
+
+
+@skip_if_nomic_not_available
+def test_jellyjoin_left_is_right(monkeypatch, left_words):
+    strategy = jj.NomicEmbeddingStrategy()
+
+    # mock out the .embed() method so we can count how often its called.
+    embeddings = strategy.embed(left_words)
+    mock_embed = Mock(side_effect=[embeddings, embeddings])
+    monkeypatch.setattr(strategy, "embed", mock_embed)
+
+    df, matrix = jj.jellyjoin(
+        left_words,
+        left_words,
+        strategy=strategy,
+        return_similarity_matrix=True,
+    )
+
+    # make sure everything's working normally
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == len(left_words)
+    assert_in_unit_interval(df["Similarity"])
+
+    # check the matrix
+    off_diagonal = ~np.eye(matrix.shape[0], dtype=bool)
+    assert np.all(np.abs(matrix[off_diagonal]) <= 0.95)
+    assert np.all(np.isclose(np.diag(matrix), 1.0))
+    assert np.all(np.isclose(matrix, matrix.T))
+
+    assert mock_embed.call_count == 1
+
+
+@skip_if_nomic_not_available
+def test_jellyjoin_asymetric(monkeypatch, left_words):
+    strategy = jj.NomicEmbeddingStrategy(task_type=("search_query", "search_document"))
+
+    # mock out the .embed() method so we can count how often its called.
+    embeddings = strategy.embed(left_words)
+    mock_embed = Mock(side_effect=[embeddings, embeddings])
+    monkeypatch.setattr(strategy, "embed", mock_embed)
+
+    df, matrix = jj.jellyjoin(
+        left_words,
+        left_words,
+        strategy=strategy,
+        return_similarity_matrix=True,
+    )
+
+    # make sure everything's working normally
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == len(left_words)
+    assert_in_unit_interval(df["Similarity"])
+
+    # check the matrix
+    off_diagonal = ~np.eye(matrix.shape[0], dtype=bool)
+    assert np.all(np.abs(matrix[off_diagonal]) <= 0.95)
+    assert np.all(np.isclose(np.diag(matrix), 1.0))
+
+    assert mock_embed.call_count == 2
+
+
+@skip_if_nomic_not_available
+def test_jellyjoin_left_is_not_right(monkeypatch, left_words, right_words):
+    strategy = jj.NomicEmbeddingStrategy()
+
+    # mock out the .embed() method so we can count how often its called.
+    mock_embed = Mock(
+        side_effect=[
+            strategy.embed(left_words, right=False),
+            strategy.embed(right_words, right=True),
+        ]
+    )
+    monkeypatch.setattr(strategy, "embed", mock_embed)
+
+    df = jj.jellyjoin(left_words, right_words, strategy=strategy)
+
+    # make sure everything's working normally
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == min(len(left_words), len(right_words))
+    assert_in_unit_interval(df["Similarity"])
+
+    # called twice, left then right
+    assert mock_embed.call_count == 2
+    assert mock_embed.call_args_list[0].kwargs["right"] is False
+    assert mock_embed.call_args_list[1].kwargs["right"] is True
 
 
 def test_jellyjoin_return_similarity_matrix(left_words, right_words):
     def validate_df(df):
         assert isinstance(df, pd.DataFrame)
         assert len(df) == min(len(left_words), len(right_words))
-        assert df["Similarity"].between(0.0, 1.0).all()
+        assert_in_unit_interval(df["Similarity"])
 
     def validate_matrix(matrix):
         assert isinstance(matrix, np.ndarray)
@@ -605,7 +733,7 @@ def test_jellyjoin_with_dataframes_all_hows(left_df, right_df, how):
         how=how,
     )
     assert isinstance(df, pd.DataFrame)
-    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"].dropna())
 
 
 @pytest.mark.parametrize("allow_many", ["neither", "left", "right", "both"])
@@ -619,7 +747,7 @@ def test_jellyjoin_allow_many(left_df, right_df, allow_many):
         allow_many=allow_many,
     )
     assert isinstance(df, pd.DataFrame)
-    assert df["Similarity"].between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"])
 
 
 @skip_if_openai_not_available
@@ -787,7 +915,7 @@ def test_jelly_class(left_words, right_words):
 
     assert isinstance(df1, pd.DataFrame)
     assert "Score" in df1.columns
-    assert df1["Score"].between(0.0, 1.0).all()
+    assert_in_unit_interval(df1["Score"])
 
     assert isinstance(mat1, np.ndarray)
     assert mat1.shape == (len(left_words), len(right_words))
@@ -835,7 +963,7 @@ def test_jelly_default_on(left_df, right_df):
     )
 
     assert isinstance(df, pd.DataFrame)
-    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"].dropna())
     assert len(df) > 0
 
 
@@ -854,7 +982,7 @@ def test_jelly_left_right_on_in_constructor(left_df, right_df):
     )
 
     assert isinstance(df, pd.DataFrame)
-    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"].dropna())
     assert len(df) > 0
     assert df.columns.tolist() == [
         "Left",
@@ -882,7 +1010,7 @@ def test_jelly_left_right_on_in_join(left_df, right_df):
     )
 
     assert isinstance(df, pd.DataFrame)
-    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"].dropna())
     assert len(df) > 0
     assert df.columns.tolist() == [
         "Left",
@@ -911,7 +1039,7 @@ def test_jelly_both_on_default_and_right_on_override(left_df, right_df):
     )
 
     assert isinstance(df, pd.DataFrame)
-    assert df["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["Similarity"].dropna())
     assert len(df) > 0
     assert df.columns.tolist() == [
         "Left",
@@ -945,7 +1073,7 @@ def test_jelly_rename_output_columns_in_constructor(left_df, right_df):
     assert "S" in df.columns and "Similarity" not in df.columns
     assert "L" in df.columns and "Left" not in df.columns
     assert "R" in df.columns and "Right" not in df.columns
-    assert df["S"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["S"].dropna())
     assert len(df) > 0
 
 
@@ -970,7 +1098,7 @@ def test_jelly_rename_output_columns_in_join(left_df, right_df):
     assert "S" in df.columns and "Similarity" not in df.columns
     assert "L" in df.columns and "Left" not in df.columns
     assert "R" in df.columns and "Right" not in df.columns
-    assert df["S"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["S"].dropna())
     assert len(df) > 0
 
 
@@ -1077,7 +1205,7 @@ def test_jelly_constructor_drop_overridden_by_join_rename(left_df, right_df):
     assert "S" in df.columns and "Similarity" not in df.columns
     assert "L" in df.columns and "Left" not in df.columns
     assert "R" in df.columns and "Right" not in df.columns
-    assert df["S"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df["S"].dropna())
     assert len(df) > 0
 
 
@@ -1103,7 +1231,7 @@ def test_jelly_on():
         threshold=0.0,
     )
     assert isinstance(df_func, pd.DataFrame)
-    assert df_func["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df_func["Similarity"].dropna())
     assert len(df_func) > 0
 
     # Jelly defaults
@@ -1115,14 +1243,14 @@ def test_jelly_on():
     df_class = jelly.join(left, right)
 
     assert isinstance(df_class, pd.DataFrame)
-    assert df_class["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df_class["Similarity"].dropna())
     assert len(df_class) > 0
 
     # .join method override
     df_class = jelly.join(left, right, on="id")
 
     assert isinstance(df_class, pd.DataFrame)
-    assert df_class["Similarity"].dropna().between(0.0, 1.0).all()
+    assert_in_unit_interval(df_class["Similarity"].dropna())
     assert len(df_class) > 0
 
     # verify that "on" was override and we are now joining on "id" instead.

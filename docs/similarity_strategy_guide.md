@@ -266,9 +266,9 @@ class RandomStrategy(SimilarityStrategy):
 
 ## 2. Subclassing EmbeddingStrategy
 
-Use this when you just want to integrate your own embedding model.
-Implement the `.embed(self, texts)` method and return a 2D array of shape `(len(texts), D)`.
-The base class handles the rest.
+Use this when you just want to integrate your own embedding model. Implement
+the `.embed(self, texts, right)` method and return a 2D array of shape
+`(len(texts), D)`. The base class handles the rest.
 
 ```python
 import numpy as np
@@ -280,7 +280,7 @@ class MyEmbeddingStrategy(EmbeddingStrategy):
         super().__init__(preprocessor=preprocessor)
         self.dtype = dtype
 
-    def embed(self, texts: Collection[str]) -> np.ndarray:
+    def embed(self, texts: Collection[str], *, right: bool = False) -> np.ndarray:
         if not len(texts):
             return np.zeros((0, 0), dtype=self.dtype)
 
@@ -288,6 +288,9 @@ class MyEmbeddingStrategy(EmbeddingStrategy):
 
         return matrix
 ```
+
+The parameter `right` will tell you if the call is for the left or right dataframe;
+you can ignore this if it doesn't matter for your use case.
 
 It might be a good idea to look at the code for the [built-in strategies][JJGHS] to
 get a good idea of how it should work.
