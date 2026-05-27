@@ -3,7 +3,7 @@
 Start by importing:
 
 ```python
-import jellyjoin.jj as jj
+import jellyjoin as jj
 ```
 
 Most strategies require an optional package install and/or additional setup.
@@ -92,7 +92,7 @@ pip install azure-identity openai tiktoken
 ```
 
 Then you can instantiate the `AzureOpenAI` client in this usual way (if you're
-using Auzre, this should already be familiar to you):
+using Azure, this should already be familiar to you):
 
 ```python
 from jellyjoin import OpenAIEmbeddingStrategy

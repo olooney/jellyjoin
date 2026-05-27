@@ -3,6 +3,8 @@ notebooks/
 REVIEW.md
 .coverage
 .dotenv
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
 
 # Byte-compiled / cache files
 __pycache__/
@@ -16,7 +18,6 @@ __pycache__/
 *.egg-info/
 
 # Jupyter
-.ipynb_checkpoints/
 
 # pytest
 .pytest_cache/

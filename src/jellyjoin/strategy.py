@@ -475,7 +475,7 @@ def get_automatic_strategy() -> SimilarityStrategy:  # pragma: no cover
 
         1. `OpenAIEmbeddingStrategy`
             This requires the "ollama" and "tiktoken" packages  to be installed
-            and the OPENAPI_API_KEY environment variable to be set.
+            and the OPENAI_API_KEY environment variable to be set.
         2. `NomicEmbeddingStrategy`
             This requires the "nomic" package to be installed and that the
             "nomic-embed-text-v1.5" model to already be download and cached.

@@ -15,9 +15,9 @@ Join dataframes or lists based on semantic similarity.
 
 ## About
 
-Jellyjoin does "soft joins" based not exact matches, but on approximate similarity. It uses a cost based
-optimization to find the "best" match. It can use older string similarity metrics as well but using a
-embedding model allows semantic similarity to be used and gives very robust and high quality matches.
+Jellyjoin does "soft joins" based not on exact matches, but on approximate similarity. It uses a cost-based
+optimization to find the "best" match. It can use older string similarity metrics as well, but using an
+embedding model allows semantic similarity to be used and gives very robust and high-quality matches.
 
 By default, jellyjoin will attempt to use OpenAI embedding models to calculate similarity if you have the `openai`
 package installed and an `OPENAI_API_KEY` in the environment. If that fails, it uses Damerau-Levenshtein similarity,
@@ -128,7 +128,7 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4)
 |      6 |       2 |     0.556893 | account.age             | integer        | Account Age (Years)          | number       |
 
 This only shows the single best match above a threshold of 0.4, which is useful if you want reliable, one-to-one matches. To include rows that didn't match
-in the result, specify how you want to join: left, right, or outer. This options works the same was as the `how` option in `pandas.merge()`:
+in the result, specify how you want to join: left, right, or outer. This option works the same way as the `how` option in `pandas.merge()`:
 
 ```python
 jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer")
@@ -148,7 +148,7 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer")
 |    nan |       7 |   nan        | nan                          | nan            | Freetext Notes               | string       |
 
 These join types show the missing rows, but they are still orphaned (not joined to anything) because by default the algorithm only takes
-the single best match. These results will show `nan` values (Panda's equivalent of NULL in SQL) for columns on the other side of the join.
+the single best match. These results will show `nan` values (Pandas' equivalent of NULL in SQL) for columns on the other side of the join.
 
 To get one-to-many, many-to-one, or many-to-many matches, specify the `allow_many` option: left, right, or both.
 
@@ -182,7 +182,7 @@ pip install -e .[dev]
 The jellyjoin unit tests skip test cases that can't be run due to missing
 optional dependencies, so to run the full test suite:
 
-1. Set up a valid `OPENAPI_API_KEY` as an environment variable or place it in a
+1. Set up a valid `OPENAI_API_KEY` as an environment variable or place it in a
 `.dotenv` file somewhere it can be found by `dotenv`.
 2. Ensure the "nomic-embed-text-v1.5" weights are downloaded and cached.
 3. Start a local ollama server running and pull the "nomic-embed-text:v1.5" model.
