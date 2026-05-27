@@ -1,6 +1,6 @@
 import logging
-from collections.abc import Collection, Iterable
-from typing import get_args
+from collections.abc import Collection, Iterable, Sequence
+from typing import Literal, TypedDict, get_args, overload
 
 import numpy as np
 import pandas as pd
@@ -23,6 +23,23 @@ logger = logging.getLogger(__name__)
 
 # internal type only used by private functions
 AssignmentList = list[tuple[int, int, float]]
+SuffixPair = tuple[str, str]
+
+
+class JellyDefaults(TypedDict):
+    on: str | None
+    left_on: str | None
+    right_on: str | None
+    strategy: StrategyLike | None
+    threshold: float
+    allow_many: AllowManyLiteral
+    how: HowLiteral
+    left_index_column: str
+    right_index_column: str
+    similarity_column: str
+    suffixes: SuffixPair
+    return_similarity_matrix: bool
+
 
 # sentinal value indicating a column should be dropped
 DROP = ""
@@ -98,7 +115,7 @@ def _triple_join(
     middle: pd.DataFrame,
     right: pd.DataFrame,
     how: HowLiteral,
-    suffixes: Iterable,
+    suffixes: SuffixPair,
 ) -> pd.DataFrame:
     """
     Joins three dataframes together, with the associations in the middle.
@@ -129,8 +146,8 @@ def _triple_join(
 
 
 def _coerce_to_dataframes(
-    left: pd.DataFrame,
-    right: pd.DataFrame,
+    left: pd.DataFrame | Collection,
+    right: pd.DataFrame | Collection,
     on: str | None,
     left_on: str | None,
     right_on: str | None,
@@ -172,7 +189,7 @@ def _coerce_to_dataframes(
 
 
 def _validate_jellyjoin_arguments(
-    suffixes: Collection,
+    suffixes: Sequence[object],
     left_index_column: str | None,
     right_index_column: str | None,
     similarity_column: str | None,
@@ -243,6 +260,7 @@ def _prepare_middle_columns(
     return middle_columns, drop_columns
 
 
+@overload
 def jellyjoin(
     left: pd.DataFrame | Collection,
     right: pd.DataFrame | Collection,
@@ -257,7 +275,46 @@ def jellyjoin(
     left_index_column: str = "Left",
     right_index_column: str = "Right",
     similarity_column: str = "Similarity",
-    suffixes: Collection = ("_left", "_right"),
+    suffixes: SuffixPair = ("_left", "_right"),
+    return_similarity_matrix: Literal[False] = False,
+) -> pd.DataFrame: ...
+
+
+@overload
+def jellyjoin(
+    left: pd.DataFrame | Collection,
+    right: pd.DataFrame | Collection,
+    *,
+    on: str | None = None,
+    left_on: str | None = None,
+    right_on: str | None = None,
+    strategy: StrategyLike | None = None,
+    threshold: float = 0.0,
+    allow_many: AllowManyLiteral = "neither",
+    how: HowLiteral = "inner",
+    left_index_column: str = "Left",
+    right_index_column: str = "Right",
+    similarity_column: str = "Similarity",
+    suffixes: SuffixPair = ("_left", "_right"),
+    return_similarity_matrix: Literal[True],
+) -> tuple[pd.DataFrame, np.ndarray]: ...
+
+
+def jellyjoin(
+    left: pd.DataFrame | Collection,
+    right: pd.DataFrame | Collection,
+    *,
+    on: str | None = None,
+    left_on: str | None = None,
+    right_on: str | None = None,
+    strategy: StrategyLike | None = None,
+    threshold: float = 0.0,
+    allow_many: AllowManyLiteral = "neither",
+    how: HowLiteral = "inner",
+    left_index_column: str = "Left",
+    right_index_column: str = "Right",
+    similarity_column: str = "Similarity",
+    suffixes: SuffixPair = ("_left", "_right"),
     return_similarity_matrix: bool = False,
 ) -> pd.DataFrame | tuple[pd.DataFrame, np.ndarray]:
     """
@@ -411,7 +468,7 @@ class Jelly:
         left_index_column: str = "Left",
         right_index_column: str = "Right",
         similarity_column: str = "Similarity",
-        suffixes: Collection = ("_left", "_right"),
+        suffixes: SuffixPair = ("_left", "_right"),
         return_similarity_matrix: bool = False,
     ) -> None:
         """
@@ -459,7 +516,7 @@ class Jelly:
         )
         return_similarity_matrix = bool(return_similarity_matrix)
 
-        self.defaults = {
+        self.defaults: JellyDefaults = {
             "on": on,
             "left_on": left_on,
             "right_on": right_on,
@@ -473,6 +530,46 @@ class Jelly:
             "suffixes": suffixes,
             "return_similarity_matrix": return_similarity_matrix,
         }
+
+    @overload
+    def join(
+        self,
+        left: pd.DataFrame | Collection,
+        right: pd.DataFrame | Collection,
+        *,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        strategy: StrategyLike | None = None,
+        threshold: float | None = None,
+        allow_many: AllowManyLiteral | None = None,
+        how: HowLiteral | None = None,
+        left_index_column: str | None = None,
+        right_index_column: str | None = None,
+        similarity_column: str | None = None,
+        suffixes: SuffixPair | None = None,
+        return_similarity_matrix: Literal[False] = False,
+    ) -> pd.DataFrame: ...
+
+    @overload
+    def join(
+        self,
+        left: pd.DataFrame | Collection,
+        right: pd.DataFrame | Collection,
+        *,
+        on: str | None = None,
+        left_on: str | None = None,
+        right_on: str | None = None,
+        strategy: StrategyLike | None = None,
+        threshold: float | None = None,
+        allow_many: AllowManyLiteral | None = None,
+        how: HowLiteral | None = None,
+        left_index_column: str | None = None,
+        right_index_column: str | None = None,
+        similarity_column: str | None = None,
+        suffixes: SuffixPair | None = None,
+        return_similarity_matrix: Literal[True],
+    ) -> tuple[pd.DataFrame, np.ndarray]: ...
 
     def join(
         self,
@@ -489,7 +586,7 @@ class Jelly:
         left_index_column: str | None = None,
         right_index_column: str | None = None,
         similarity_column: str | None = None,
-        suffixes: Collection | None = None,
+        suffixes: SuffixPair | None = None,
         return_similarity_matrix: bool | None = None,
     ) -> pd.DataFrame | tuple[pd.DataFrame, np.ndarray]:
         """
@@ -549,38 +646,77 @@ class Jelly:
         TypeError
             If argument types are incompatible with expected input formats.
         """
+        resolved_on = self.defaults["on"] if on is None else on
+        resolved_left_on = self.defaults["left_on"] if left_on is None else left_on
+        resolved_right_on = self.defaults["right_on"] if right_on is None else right_on
 
-        options = {
-            "on": on,
-            "left_on": left_on,
-            "right_on": right_on,
-            "strategy": strategy,
-            "threshold": threshold,
-            "allow_many": allow_many,
-            "how": how,
-            "left_index_column": left_index_column,
-            "right_index_column": right_index_column,
-            "similarity_column": similarity_column,
-            "suffixes": suffixes,
-            "return_similarity_matrix": return_similarity_matrix,
-        }
+        if on is not None:
+            resolved_left_on = None
+            resolved_right_on = None
+        elif left_on is not None or right_on is not None:
+            resolved_on = None
 
-        # filter out all options which are None.
-        options = {k: v for k, v in options.items() if v is not None}
+        resolved_strategy = self.defaults["strategy"] if strategy is None else strategy
+        resolved_threshold = (
+            self.defaults["threshold"] if threshold is None else threshold
+        )
+        resolved_allow_many = (
+            self.defaults["allow_many"] if allow_many is None else allow_many
+        )
+        resolved_how = self.defaults["how"] if how is None else how
+        resolved_left_index_column = (
+            self.defaults["left_index_column"]
+            if left_index_column is None
+            else left_index_column
+        )
+        resolved_right_index_column = (
+            self.defaults["right_index_column"]
+            if right_index_column is None
+            else right_index_column
+        )
+        resolved_similarity_column = (
+            self.defaults["similarity_column"]
+            if similarity_column is None
+            else similarity_column
+        )
+        resolved_suffixes = self.defaults["suffixes"] if suffixes is None else suffixes
+        resolved_return_similarity_matrix = (
+            self.defaults["return_similarity_matrix"]
+            if return_similarity_matrix is None
+            else return_similarity_matrix
+        )
 
-        # copy the defaults so we can modify it
-        defaults = self.defaults.copy()
+        if resolved_return_similarity_matrix:
+            return jellyjoin(
+                left,
+                right,
+                on=resolved_on,
+                left_on=resolved_left_on,
+                right_on=resolved_right_on,
+                strategy=resolved_strategy,
+                threshold=resolved_threshold,
+                allow_many=resolved_allow_many,
+                how=resolved_how,
+                left_index_column=resolved_left_index_column,
+                right_index_column=resolved_right_index_column,
+                similarity_column=resolved_similarity_column,
+                suffixes=resolved_suffixes,
+                return_similarity_matrix=True,
+            )
 
-        # avoid the error caused by defining both "on" and "left/right_on"
-        if "on" in options:
-            defaults.pop("left_on", None)
-            defaults.pop("right_on", None)
-        if "left_on" in options or "right_on" in options:
-            defaults["left_on"] = defaults["on"]
-            defaults["right_on"] = defaults["on"]
-            defaults.pop("on")
-
-        # combine the options and defaults, with options overriding defaults.
-        kwargs = {**defaults, **options}
-
-        return jellyjoin(left, right, **kwargs)
+        return jellyjoin(
+            left,
+            right,
+            on=resolved_on,
+            left_on=resolved_left_on,
+            right_on=resolved_right_on,
+            strategy=resolved_strategy,
+            threshold=resolved_threshold,
+            allow_many=resolved_allow_many,
+            how=resolved_how,
+            left_index_column=resolved_left_index_column,
+            right_index_column=resolved_right_index_column,
+            similarity_column=resolved_similarity_column,
+            suffixes=resolved_suffixes,
+            return_similarity_matrix=False,
+        )

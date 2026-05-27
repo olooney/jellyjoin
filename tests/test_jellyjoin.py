@@ -1,6 +1,7 @@
 import os
 import re
 from functools import wraps
+from typing import cast
 from unittest.mock import Mock
 
 import dotenv
@@ -359,6 +360,7 @@ def test_pairwise_jellyjoin_empty(empties):
 def test_openai_empty(empties):
     left, right = empties
     strategy = jj.get_similarity_strategy("openai")
+    assert isinstance(strategy, jj.OpenAIEmbeddingStrategy)
     matrix = strategy(left, right)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
@@ -373,6 +375,7 @@ def test_openai_empty(empties):
 def test_nomic_empty(empties):
     left, right = empties
     strategy = jj.get_similarity_strategy("nomic")
+    assert isinstance(strategy, jj.NomicEmbeddingStrategy)
     matrix = strategy(left, right)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
@@ -387,6 +390,7 @@ def test_nomic_empty(empties):
 def test_ollama_empty(empties):
     left, right = empties
     strategy = jj.get_similarity_strategy("ollama")
+    assert isinstance(strategy, jj.OllamaEmbeddingStrategy)
     matrix = strategy(left, right)
     assert isinstance(matrix, np.ndarray)
     assert matrix.shape == (len(left), len(right))
@@ -403,7 +407,7 @@ def test_openai_validation():
         TypeError,
         match=r"embedding_model must be the name of an OpenAI embedding model as a string\.",
     ):
-        jj.OpenAIEmbeddingStrategy(embedding_model=123)
+        jj.OpenAIEmbeddingStrategy(embedding_model=123)  # ty: ignore[invalid-argument-type]
 
     # TODO additional validation
 
@@ -414,7 +418,7 @@ def test_nomic_validation():
         TypeError,
         match=r"embedding_model must be the name of a Nomic embedding model as a string\.",
     ):
-        jj.NomicEmbeddingStrategy(embedding_model=123)
+        jj.NomicEmbeddingStrategy(embedding_model=123)  # ty: ignore[invalid-argument-type]
 
 
 @skip_if_ollama_not_available
@@ -441,24 +445,28 @@ def test_ollama_validation():
         TypeError,
         match=r"embedding_model must be the name of an Ollama embedding model as a string\.",
     ):
-        jj.OllamaEmbeddingStrategy(embedding_model=123)
+        jj.OllamaEmbeddingStrategy(embedding_model=123)  # ty: ignore[invalid-argument-type]
 
 
 def test_jellyjoin_validation():
     with pytest.raises(ValueError, match=r"Pass exactly two suffixes\."):
-        jj.jellyjoin([], [], suffixes=("only_one",))
+        jj.jellyjoin([], [], suffixes=cast(tuple[str, str], ("only_one",)))
 
     with pytest.raises(ValueError, match=r"Pass exactly two suffixes\."):
-        jj.jellyjoin([], [], suffixes=("_left", "_right", "_extra"))
+        jj.jellyjoin(
+            [],
+            [],
+            suffixes=cast(tuple[str, str], ("_left", "_right", "_extra")),
+        )
 
     with pytest.raises(ValueError, match=r"suffixes cannot be the same\."):
         jj.jellyjoin([], [], suffixes=("_left_foot", "_left_foot"))
 
     with pytest.raises(TypeError, match=r"suffixes\[0\] must be a string\."):
-        jj.jellyjoin([], [], suffixes=(None, "_right"))
+        jj.jellyjoin([], [], suffixes=cast(tuple[str, str], (None, "_right")))
 
     with pytest.raises(TypeError, match=r"suffixes\[1\] must be a string\."):
-        jj.jellyjoin([], [], suffixes=("_left", 5))
+        jj.jellyjoin([], [], suffixes=cast(tuple[str, str], ("_left", 5)))
 
     with pytest.raises(TypeError, match=r"suffixes\[0\] cannot be an empty string\."):
         jj.jellyjoin([], [], suffixes=("", "_right"))
@@ -467,23 +475,23 @@ def test_jellyjoin_validation():
         jj.jellyjoin([], [], suffixes=("_left", ""))
 
     with pytest.raises(TypeError, match=r"similarity_column must be a string\."):
-        jj.jellyjoin([], [], similarity_column=123)
+        jj.jellyjoin([], [], similarity_column=123)  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(TypeError, match=r"left_index_column must be a string\."):
-        jj.jellyjoin([], [], left_index_column=123)
+        jj.jellyjoin([], [], left_index_column=123)  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(TypeError, match=r"right_index_column must be a string\."):
-        jj.jellyjoin([], [], right_index_column=123)
+        jj.jellyjoin([], [], right_index_column=123)  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(
         ValueError, match=r'allow_many must be "left", "right", "both", or "neither"\.'
     ):
-        jj.jellyjoin([], [], allow_many="some")
+        jj.jellyjoin([], [], allow_many="some")  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(
         ValueError, match=r'how argument must be "inner", "left", "right", or "outer"\.'
     ):
-        jj.jellyjoin([], [], how="joiny")
+        jj.jellyjoin([], [], how="joiny")  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(
         ValueError,
@@ -501,19 +509,19 @@ def test_jellyjoin_validation():
         TypeError,
         match=r"Arguments `on`, `left_on`, and `right_on` must be strings if supplied\.",
     ):
-        jj.jellyjoin([], [], on=42)
+        jj.jellyjoin([], [], on=42)  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(
         TypeError,
         match=r"Arguments `on`, `left_on`, and `right_on` must be strings if supplied\.",
     ):
-        jj.jellyjoin([], [], left_on=42)
+        jj.jellyjoin([], [], left_on=42)  # ty: ignore[invalid-argument-type]
 
     with pytest.raises(
         TypeError,
         match=r"Arguments `on`, `left_on`, and `right_on` must be strings if supplied\.",
     ):
-        jj.jellyjoin([], [], right_on=42)
+        jj.jellyjoin([], [], right_on=42)  # ty: ignore[invalid-argument-type]
 
 
 def test_jellyjoin_options():
@@ -861,7 +869,7 @@ def test_get_similarity_strategy():
 
     # raise for anything else
     with pytest.raises(TypeError):
-        jj.get_similarity_strategy(123)
+        jj.get_similarity_strategy(123)  # ty: ignore[invalid-argument-type]
 
 
 @skip_if_openai_not_available
@@ -897,10 +905,10 @@ def test_get_similarity_strategy_ollama(left_words, right_words):
 def test_jelly_class(left_words, right_words):
     # remember options
     with pytest.raises(ValueError):
-        jj.Jelly(suffixes=("_only",))
+        jj.Jelly(suffixes=cast(tuple[str, str], ("_only",)))
 
     with pytest.raises(ValueError):
-        jj.Jelly(how="not-a-valid-how")
+        jj.Jelly(how="not-a-valid-how")  # ty: ignore[invalid-argument-type]
 
     jelly = jj.Jelly(
         strategy="jaro",

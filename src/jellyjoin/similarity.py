@@ -1,3 +1,5 @@
+from typing import cast
+
 import jellyfish
 
 from .typing import SimilarityCallable, SimilarityLike
@@ -184,7 +186,7 @@ def get_similarity_function(
 
     # pass through the callable
     if callable(function):
-        return function
+        return cast(SimilarityCallable, function)
 
     key = function.strip().lower().replace("-", "_").removesuffix("_similarity")
     return FUNCTION_MAP[key]

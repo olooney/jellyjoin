@@ -1,4 +1,5 @@
 import logging
+from abc import abstractmethod
 from collections.abc import Collection
 from pathlib import Path
 from typing import Literal
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # global used to cache the automatic strategy to prevent instantiating a new
 # OpenAI client for every call.
-_cached_strategy = None
+_cached_strategy: SimilarityStrategy | None = None
 
 
 # identity function used as a default argument to several functions
@@ -73,6 +74,12 @@ class EmbeddingStrategy(SimilarityStrategy):
             A callable applied to each text before embedding. Defaults to `identity`.
         """
         self.preprocessor = preprocessor
+
+    @abstractmethod
+    def embed(self, texts: Collection[str], *, right: bool = False) -> np.ndarray:
+        """
+        Return a matrix of embeddings for the supplied texts.
+        """
 
     def __call__(
         self,
@@ -202,10 +209,12 @@ class OpenAIEmbeddingStrategy(EmbeddingStrategy):
         if not len(texts):
             return np.zeros((0, 0), dtype=self.dtype)
 
+        text_list = list(texts)
+
         # batch calls to the API so we stay under the limit
         all_vectors = []
-        for i in range(0, len(texts), self.batch_size):
-            raw_batch = texts[i : i + self.batch_size]
+        for i in range(0, len(text_list), self.batch_size):
+            raw_batch = text_list[i : i + self.batch_size]
             batch = [self._truncate(text) for text in raw_batch]
 
             vectors = self._call_embedding_api(batch)
@@ -286,10 +295,11 @@ class NomicEmbeddingStrategy(EmbeddingStrategy):
             return np.zeros((0, 0), dtype=self.dtype)
 
         side_index = int(right)
+        text_list = list(texts)
 
         # nomic does its own batching under the hood
         result = self.nomic_embed.text(
-            texts=texts,
+            texts=text_list,
             model=self.embedding_model,
             task_type=self.task_types[side_index],
             inference_mode="local",

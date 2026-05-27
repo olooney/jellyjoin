@@ -30,7 +30,7 @@ SimilarityLiteral: TypeAlias = Literal[
     "jaro",
     "jaro_winkler",
 ]
-SimilarityLike: TypeAlias = SimilarityLiteral | SimilarityCallable
+SimilarityLike: TypeAlias = str | SimilarityLiteral | SimilarityCallable
 
 StrategyLiteral: TypeAlias = Literal[
     "openai",
@@ -38,7 +38,7 @@ StrategyLiteral: TypeAlias = Literal[
     "ollama",
 ]
 StrategyLike: TypeAlias = (
-    SimilarityStrategy | StrategyLiteral | SimilarityLiteral | StrategyCallable
+    str | SimilarityStrategy | StrategyLiteral | SimilarityLiteral | StrategyCallable
 )
 
 # types used by join

@@ -45,6 +45,7 @@ dev = [
     "python-dotenv",
     "ruff",
     "twine",
+    "ty>=0.0.39",
 ]
 
 test = [

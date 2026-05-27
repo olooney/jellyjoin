@@ -87,7 +87,7 @@ def test_plot_associations(tmp_path, pre_ax):
     assert ax.get_title() == "Associations"
 
     # there should be as many connecting lines as rows
-    line_count = sum(1 for line in ax.lines if len(line.get_xdata()) == 2)
+    line_count = sum(1 for line in ax.lines if len(np.asarray(line.get_xdata())) == 2)
     assert line_count == len(df)
 
     out = tmp_path / "associations.png"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,7 +68,7 @@ def plot_similarity_matrix(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.figure
+        fig = cast(Figure, ax.figure)
 
     sim = np.asarray(similarity_matrix)
     if sim.ndim != 2:
@@ -177,7 +178,7 @@ def plot_associations(
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
-        fig = ax.figure
+        fig = cast(Figure, ax.figure)
 
     required = {left_column, right_column, left_index_column, right_index_column}
     missing = required - set(association_df.columns)

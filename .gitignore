@@ -1,4 +1,5 @@
 dist/
+uv.lock
 notebooks/
 REVIEW.md
 .coverage
