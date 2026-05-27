@@ -353,8 +353,14 @@ def jellyjoin(
         left, right, on, left_on, right_on
     )
 
+    left_texts = left[left_on]
+    if left is right and left_on == right_on:
+        right_texts = left_texts
+    else:
+        right_texts = right[right_on]
+
     # Calculate similarity matrix
-    similarity_matrix = strategy(left[left_on], right[right_on])
+    similarity_matrix = strategy(left_texts, right_texts)
 
     # Find optimal one-to-one assignments using Hungarian algorithm
     logger.debug("Solving assignment problem for %s matrix.", similarity_matrix.shape)
