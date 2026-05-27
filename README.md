@@ -161,12 +161,24 @@ jellyjoin.jellyjoin(left_df, right_df, threshold=0.4, how="outer", allow_many="b
 Records that don't join to anything on the other side (with a similarity greater than the threshold) will still be left unjoined.
 
 
-## Advanced Usage
+## Advanced
 
-[Similarity Strategy Guide](https://github.com/olooney/jellyjoin/blob/main/docs/similarity_strategy_guide.md) (Work in Progress)
+Jellyjoin can use traditional string distance metrics, but is really designed to use a semantic vector embedding model.
+The tricky part is getting the embedding vectors.
 
-TODO: Hungarian Algorithm.
+If you already have OpenAI, Azure OpenAI or Ollama as dependencies for your project, you can use those; otherwise I
+recommend using Nomic. You can read more about configuring these, or even writing your own, in this guide:
 
+[Similarity Strategy Guide](https://github.com/olooney/jellyjoin/blob/main/docs/similarity_strategy_guide.md)
+
+If your project doesn't have an embedding model already, I recommend starting with the local Nomic model.
+
+Given `N` strings on the left and `M` strings on the right, Jellyjoin only makes `O(N + M)` embedding calls; after that,
+taking the outer product to obtain the full `NxM` matrix of all possible comparisons is very fast; then the [Hungarian
+algorithm][HA] lets us find the best possible matches in roughly `O(N^3)` (assuming `N <= M`) which is also fast for
+reasonable `N`. Jellyjoin uses `scipy.linear_sum_assignment` under the hood, which is implements [Jonker-Volgenant][LSA],
+(the currently best known algorithm) and is competitive with over similar solvers. The bottom line is, the embedding
+model is likely going to be the bottleneck until truely large N.
 
 
 ## Development
@@ -193,3 +205,17 @@ Run tests:
 ```bash
 pytest
 ```
+
+Jellyjoin uses pre-commit to run various linters and the `ty` type checker. Make
+sure you run:
+
+```bash
+pre-commit install
+```
+
+to register pre-commit with git.
+
+
+
+[HA]: https://en.wikipedia.org/wiki/Hungarian_algorithm
+[LSA]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html#rc35ed51944ec-2
